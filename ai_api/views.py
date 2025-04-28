@@ -1,4 +1,5 @@
 # ai_api/views.py
+from django.conf import settings  # 添加这一行
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
@@ -8,7 +9,6 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# 这个视图函数用于处理流式聊天的响应
 @login_required
 def stream_response(request):
     """处理流式聊天响应的视图函数"""
