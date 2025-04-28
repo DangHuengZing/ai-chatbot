@@ -1,6 +1,7 @@
 # ai_api/views.py
 from django.conf import settings
 from django.http import StreamingHttpResponse, JsonResponse
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 import json
@@ -8,6 +9,11 @@ import logging
 import requests
 
 logger = logging.getLogger(__name__)
+
+@login_required
+def chat_page(request):
+    """返回聊天页面"""
+    return render(request, "ai_api/stream_chat.html")  # 指向你的 templates/ai_api/stream_chat.html
 
 @login_required
 @csrf_exempt
@@ -59,4 +65,3 @@ def stream_chat(request):
     except Exception as e:
         logger.exception('Error in stream_chat')
         return JsonResponse({'error': str(e)}, status=500)
-
