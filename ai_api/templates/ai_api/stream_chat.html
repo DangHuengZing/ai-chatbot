@@ -1,120 +1,187 @@
-<!-- ai_api/templates/ai_api/stream_chat.html -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <title>DeepSeek 智能助手</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
   <style>
-    body { font-family: 'Helvetica Neue', sans-serif; background: #f7fafc; margin: 0; padding: 2rem; }
-    #chat-container { background: white; max-width: 800px; margin: auto; border-radius: 12px; padding: 2rem; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    #chat-box { height: 60vh; overflow-y: auto; margin-bottom: 1rem; }
-    .message { margin: 1rem 0; padding: 1rem; border-radius: 8px; background: #edf2f7; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f8fafc;
+    }
+
+    #chat-container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+    }
+
+    #chat-box {
+      height: 60vh;
+      overflow-y: auto;
+      background: #f8fafc;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      padding: 1rem;
+    }
+
+    .message {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
     .user-message { border-left: 4px solid #4299e1; }
     .ai-message { border-left: 4px solid #48bb78; }
-    textarea { width: 100%; padding: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e0; }
-    button { background: #3182ce; color: white; padding: 0.6rem 1.2rem; border: none; border-radius: 6px; cursor: pointer; margin-top: 1rem; }
-    button:hover { background: #2c5282; }
-    select { margin-bottom: 1rem; padding: 0.5rem; }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    .message-header strong {
+      margin-right: 0.5rem;
+    }
+
+    .timestamp {
+      font-size: 0.8rem;
+      color: #718096;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 1rem;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      min-height: 80px;
+      resize: vertical;
+    }
+
+    button {
+      background: #2b6cb0;
+      color: white;
+      border: none;
+      padding: 0.7rem 1.2rem;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-left: 1rem;
+      transition: background 0.3s;
+    }
+
+    button:hover {
+      background: #2c5282;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
-  <div id="chat-container">
-    <h1>DeepSeek 智能助手</h1>
-    <select id="model-select">
-      <option value="v3">通用聊天模型 (v3)</option>
-      <option value="r1">代码助手 (r1)</option>
-    </select>
-    <div id="chat-box"></div>
-    <textarea id="user-input" placeholder="输入你的问题（Shift+Enter换行）" onkeydown="handleKeydown(event)"></textarea>
+<div id="chat-container">
+  <h1>DeepSeek 智能助手</h1>
+
+  <div id="chat-box"></div>
+
+  <div style="display: flex; margin-top: 1rem;">
+    <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKey(event)"></textarea>
     <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
+</div>
 
-  <script>
+<script>
+let controller = null;
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+async function sendMessage() {
+  const input = document.getElementById('user-input');
+  const chatBox = document.getElementById('chat-box');
+  const sendBtn = document.getElementById('send-btn');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // 添加用户消息
+  const userMsg = createMessage('您', text, 'user-message');
+  chatBox.appendChild(userMsg);
+  scrollBottom();
+
+  input.value = '';
+  sendBtn.disabled = true;
+  sendBtn.innerText = "发送中...";
+
+  const aiMsg = createMessage('AI助手', '', 'ai-message');
+  chatBox.appendChild(aiMsg);
+  scrollBottom();
+
+  try {
+    controller = new AbortController();
+    const response = await fetch('/chat/stream/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: text, model: 'v3' }),
+      signal: controller.signal
+    });
+
+    const reader = response.body
+      .pipeThrough(new TextDecoderStream())
+      .getReader();
+
+    let content = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const data = JSON.parse(value.replace('data: ', ''));
+      if (data.error) {
+        content = data.error;
+        break;
+      }
+      content += data.content;
+      updateMessage(aiMsg, content);
+      scrollBottom();
+    }
+
+  } catch (err) {
+    updateMessage(aiMsg, '出错了，请稍后再试。');
+  } finally {
+    sendBtn.disabled = false;
+    sendBtn.innerText = "发送";
+    controller = null;
+  }
+}
+
+function createMessage(sender, text, className) {
+  const div = document.createElement('div');
+  div.className = 'message ' + className;
+  div.innerHTML = `<div class="message-header"><strong>${sender}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span></div><div class="content"></div>`;
+  return div;
+}
+
+function updateMessage(element, content) {
+  element.querySelector('.content').innerHTML = DOMPurify.sanitize(marked.parse(content));
+}
+
+function scrollBottom() {
+  requestAnimationFrame(() => {
     const chatBox = document.getElementById('chat-box');
-    const sendBtn = document.getElementById('send-btn');
-    let controller = null;
-
-    function handleKeydown(event) {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        sendMessage();
-      }
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById('user-input');
-      const question = input.value.trim();
-      const model = document.getElementById('model-select').value;
-
-      if (!question) return;
-
-      sendBtn.disabled = true;
-      input.value = '';
-
-      // 用户消息
-      const userMsg = createMessage('user', question);
-      chatBox.appendChild(userMsg);
-      scrollToBottom();
-
-      // AI消息框
-      const aiMsg = createMessage('ai', '');
-      chatBox.appendChild(aiMsg);
-      scrollToBottom();
-
-      controller = new AbortController();
-      try {
-        const response = await fetch('/chat/stream/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-          },
-          body: JSON.stringify({ question, model }),
-          signal: controller.signal
-        });
-
-        const reader = response.body
-          .pipeThrough(new TextDecoderStream())
-          .getReader();
-
-        let content = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const lines = value.trim().split("\n");
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const data = JSON.parse(line.replace('data: ', ''));
-            if (data.error) {
-              aiMsg.innerHTML = `<span style="color:red;">${data.error}</span>`;
-              return;
-            }
-            content += data.content;
-            aiMsg.innerHTML = DOMPurify.sanitize(marked.parse(content));
-            scrollToBottom();
-          }
-        }
-      } catch (err) {
-        console.error('出错:', err);
-      } finally {
-        sendBtn.disabled = false;
-        controller = null;
-      }
-    }
-
-    function createMessage(role, text) {
-      const div = document.createElement('div');
-      div.className = `message ${role}-message`;
-      div.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><br><div>${text}</div>`;
-      return div;
-    }
-
-    function scrollToBottom() {
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-  </script>
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
+</script>
 </body>
 </html>
