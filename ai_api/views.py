@@ -75,3 +75,10 @@ def stream_response(request):
             yield json.dumps({"message": msg}) + "\n"
     
     return StreamingHttpResponse(generate_response(), content_type="application/json")
+from django.http import HttpResponse
+
+def clear_stream_history(request):
+    # 这里实现清空流历史的逻辑，例如清空 session 或数据库记录
+    return HttpResponse("Stream history cleared")
+
+
