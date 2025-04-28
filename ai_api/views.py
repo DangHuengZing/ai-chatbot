@@ -58,3 +58,20 @@ def stream_chat(request):
     except Exception as e:
         logger.exception('Error in stream_chat')
         return JsonResponse({'error': str(e)}, status=500)
+
+from django.http import StreamingHttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def stream_response(request):
+    """
+    流式聊天响应视图，处理用户输入并返回流式输出。
+    """
+    def generate_response():
+        # 示例：模拟流式响应
+        messages = ["Hello", " ", "from", " ", "AI", "!"]
+        for msg in messages:
+            yield json.dumps({"message": msg}) + "\n"
+    
+    return StreamingHttpResponse(generate_response(), content_type="application/json")
