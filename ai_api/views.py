@@ -1,23 +1,3 @@
-# ai_api/models.py
-from django.db import models
-from django.contrib.auth.models import User
-from .models import ChatMessage  # 从models导入而不是重新定义
-
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    model_type = models.CharField(max_length=2, choices=MODEL_CHOICES)
-    role = models.CharField(max_length=20)
-    content = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
-    is_stream = models.BooleanField(default=False)
-
-    class Meta:
-        ordering = ['-timestamp']
-        indexes = [
-            models.Index(fields=['user', 'model_type']),
-        ]
-
-# ai_api/views.py
 from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
@@ -26,7 +6,7 @@ from django.conf import settings
 import json
 import requests
 import logging
-from .models import ChatMessage
+from .models import ChatMessage  # 这里正确导入 ChatMessage 模型
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +16,7 @@ MODEL_MAP = {
     'r1': {'name': 'deepseek-coder', 'desc': '代码专用模型'}
 }
 
+# 确保没有缩进错误
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -131,40 +112,3 @@ def stream_chat(request):
     except Exception as e:
         logger.exception('Chat error')
         return JsonResponse({'error': str(e)}, status=500)
-
-@login_required
-def chat_history(request):
-    """获取聊天历史"""
-    try:
-        model_type = request.GET.get('model')
-        messages = ChatMessage.objects.filter(
-            user=request.user,
-            model_type=model_type
-        ).order_by('timestamp')[:50]
-        
-        return JsonResponse([
-            {
-                'id': msg.id,
-                'role': msg.role,
-                'content': msg.content,
-                'timestamp': msg.timestamp.isoformat(),
-                'model': msg.model_type
-            }
-            for msg in messages
-        ], safe=False)
-        
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-@login_required
-@csrf_exempt
-def clear_history(request):
-    """清空指定模型的聊天历史"""
-    if request.method == 'POST':
-        model_type = json.loads(request.body).get('model')
-        ChatMessage.objects.filter(
-            user=request.user,
-            model_type=model_type
-        ).delete()
-        return JsonResponse({'status': 'success'})
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
