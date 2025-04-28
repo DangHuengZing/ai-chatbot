@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
 import requests
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ def stream_chat(request):
     try:
         body = json.loads(request.body)
         question = body.get('question', '').strip()
-        model_key = body.get('model', 'v3')  # 默认用v3
+        model_key = body.get('model', 'v3')
 
         if not question:
             return JsonResponse({'error': '问题不能为空'}, status=400)
@@ -52,7 +53,10 @@ def stream_chat(request):
                             try:
                                 data = json.loads(decoded_line)
                                 delta = data['choices'][0]['delta'].get('content', '')
-                                yield f"data: {json.dumps({'content': delta})}\n\n"
+                                # 打字机效果，逐字返回
+                                for char in delta:
+                                    yield f"data: {json.dumps({'content': char})}\n\n"
+                                    time.sleep(0.02)  # 每个字符间隔20毫秒
                             except json.JSONDecodeError:
                                 logger.warning('Invalid JSON data: %s', decoded_line)
             except Exception as e:
@@ -64,3 +68,8 @@ def stream_chat(request):
     except Exception as e:
         logger.exception('Error in stream_chat')
         return JsonResponse({'error': str(e)}, status=500)
+
+@login_required
+def chat_history(request):
+    """聊天历史（暂时返回空）"""
+    return JsonResponse([], safe=False)
