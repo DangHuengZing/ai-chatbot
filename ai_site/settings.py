@@ -93,3 +93,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # DeepSeek API Key (make sure to replace it with your actual key)
 DEEPSEEK_API_KEY = 'sk-8d62e2d709e445ae979ed1b20450b5a3'  # Replace with your real key
+
+LOGIN_REDIRECT_URL = '/stream_chat/'
