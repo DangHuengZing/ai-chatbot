@@ -1,5 +1,5 @@
 # ai_api/views.py
-from django.conf import settings  # 添加这一行
+from django.conf import settings
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
 import json
@@ -9,14 +9,14 @@ import requests
 logger = logging.getLogger(__name__)
 
 @login_required
-def stream_response(request):
-    """处理流式聊天响应的视图函数"""
+def stream_chat(request):
+    """处理流式聊天请求的视图函数"""
     try:
         # 解析请求中的参数
         body = json.loads(request.body)
         message = body.get('message', '')
         
-        # 调用 DeepSeek API（你可以根据实际情况调整）
+        # 调用 DeepSeek API（根据实际需求调整）
         headers = {'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}'}
         payload = {
             'model': 'deepseek-chat',
@@ -56,5 +56,5 @@ def stream_response(request):
         return StreamingHttpResponse(event_stream(), content_type='text/event-stream')
 
     except Exception as e:
-        logger.exception('Error in stream_response')
+        logger.exception('Error in stream_chat')
         return JsonResponse({'error': str(e)}, status=500)
