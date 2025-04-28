@@ -6,92 +6,22 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@2.4.0/dist/purify.min.js"></script>
   <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem;
-      background: #f8fafc;
-    }
-
-    #chat-container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      padding: 1.5rem;
-    }
-
-    #chat-box {
-      height: 60vh;
-      overflow-y: auto;
-      background: #f8fafc;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      padding: 1rem;
-    }
-
-    .message {
-      margin: 1rem 0;
-      padding: 1rem;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #f8fafc; }
+    #chat-container { background: white; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 1.5rem; }
+    #chat-box { height: 65vh; overflow-y: auto; background: #f8fafc; border-radius: 8px; margin-bottom: 1rem; padding: 1rem; }
+    .message { margin: 1rem 0; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .user-message { border-left: 4px solid #4299e1; }
     .ai-message { border-left: 4px solid #48bb78; }
-
-    .message-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 0.5rem;
-    }
-
-    .message-header strong {
-      margin-right: 0.5rem;
-    }
-
-    .timestamp {
-      font-size: 0.8rem;
-      color: #718096;
-    }
-
-    textarea {
-      width: 100%;
-      padding: 1rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      min-height: 80px;
-      resize: vertical;
-    }
-
-    button {
-      background: #2b6cb0;
-      color: white;
-      border: none;
-      padding: 0.7rem 1.2rem;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-left: 1rem;
-      transition: background 0.3s;
-    }
-
-    button:hover {
-      background: #2c5282;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
+    textarea { width: 100%; padding: 1rem; border: 2px solid #e2e8f0; border-radius: 8px; resize: vertical; min-height: 80px; }
+    button { background: #2b6cb0; color: white; border: none; padding: 0.7rem 1.2rem; border-radius: 8px; cursor: pointer; margin-left: 1rem; transition: background 0.3s; }
+    button:hover { background: #2c5282; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
   </style>
 </head>
 <body>
 <div id="chat-container">
   <h1>DeepSeek 智能助手</h1>
-
   <div id="chat-box"></div>
-
   <div style="display: flex; margin-top: 1rem;">
     <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKey(event)"></textarea>
     <button id="send-btn" onclick="sendMessage()">发送</button>
@@ -115,18 +45,17 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  // 添加用户消息
   const userMsg = createMessage('您', text, 'user-message');
   chatBox.appendChild(userMsg);
   scrollBottom();
-
   input.value = '';
-  sendBtn.disabled = true;
-  sendBtn.innerText = "发送中...";
 
   const aiMsg = createMessage('AI助手', '', 'ai-message');
   chatBox.appendChild(aiMsg);
   scrollBottom();
+
+  sendBtn.disabled = true;
+  sendBtn.innerText = "发送中...";
 
   try {
     controller = new AbortController();
@@ -148,14 +77,13 @@ async function sendMessage() {
       if (done) break;
       const data = JSON.parse(value.replace('data: ', ''));
       if (data.error) {
-        content = data.error;
+        updateMessage(aiMsg, data.error, true);
         break;
       }
       content += data.content;
       updateMessage(aiMsg, content);
       scrollBottom();
     }
-
   } catch (err) {
     updateMessage(aiMsg, '出错了，请稍后再试。');
   } finally {
@@ -168,19 +96,18 @@ async function sendMessage() {
 function createMessage(sender, text, className) {
   const div = document.createElement('div');
   div.className = 'message ' + className;
-  div.innerHTML = `<div class="message-header"><strong>${sender}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span></div><div class="content"></div>`;
+  div.innerHTML = `<div><strong>${sender}</strong> <span style="font-size:0.8rem; color: #666;">${new Date().toLocaleTimeString()}</span></div><div class="content">${text}</div>`;
   return div;
 }
 
-function updateMessage(element, content) {
-  element.querySelector('.content').innerHTML = DOMPurify.sanitize(marked.parse(content));
+function updateMessage(element, content, isError = false) {
+  const contentDiv = element.querySelector('.content');
+  contentDiv.innerHTML = isError ? `<span style="color:red;">${content}</span>` : DOMPurify.sanitize(marked.parse(content));
 }
 
 function scrollBottom() {
-  requestAnimationFrame(() => {
-    const chatBox = document.getElementById('chat-box');
-    chatBox.scrollTop = chatBox.scrollHeight;
-  });
+  const chatBox = document.getElementById('chat-box');
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 </script>
 </body>
