@@ -59,3 +59,12 @@ def stream_response(request):
     except Exception as e:
         logger.exception('Error in stream_response')
         return JsonResponse({'error': str(e)}, status=500)
+
+# ai_api/views.py
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def chat(request):
+    return JsonResponse({'message': 'Welcome to the chat!'})
+
