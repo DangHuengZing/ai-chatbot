@@ -1,38 +1,31 @@
 # ai_api/views.py
 from django.conf import settings
-from django.shortcuts import render
-from django.http import JsonResponse, StreamingHttpResponse
-from django.contrib.auth.decorators import login_required
+from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth.decorators import login_required
 import json
 import logging
 import requests
-import time
 
 logger = logging.getLogger(__name__)
 
 @login_required
-def chat_page(request):
-    """渲染聊天页面"""
-    return render(request, 'ai_api/stream_chat.html')
-
-@login_required
 @csrf_exempt
 def stream_chat(request):
-    """处理流式聊天"""
+    """处理流式聊天请求"""
     try:
         body = json.loads(request.body)
-        question = body.get('question', '').strip()
-        model_key = body.get('model', 'v3')
+        question = body.get('question', '')
+        model = body.get('model', 'v3')
 
-        if not question:
-            return JsonResponse({'error': '问题不能为空'}, status=400)
-
-        headers = {'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}'}
+        headers = {
+            'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
+            'Content-Type': 'application/json'
+        }
         payload = {
-            'model': 'deepseek-chat' if model_key == 'v3' else 'deepseek-coder',
+            'model': 'deepseek-chat' if model == 'v3' else 'deepseek-coder',
             'messages': [{'role': 'user', 'content': question}],
-            'stream': True
+            'stream': True,
         }
 
         def event_stream():
@@ -45,23 +38,21 @@ def stream_chat(request):
                     timeout=30
                 ) as response:
                     response.raise_for_status()
+
                     for line in response.iter_lines():
                         if line:
-                            decoded_line = line.decode('utf-8').lstrip('data: ')
-                            if decoded_line == '[DONE]':
+                            decoded = line.decode('utf-8').lstrip('data: ')
+                            if decoded == '[DONE]':
                                 break
                             try:
-                                data = json.loads(decoded_line)
+                                data = json.loads(decoded)
                                 delta = data['choices'][0]['delta'].get('content', '')
-                                # 打字机效果，逐字返回
-                                for char in delta:
-                                    yield f"data: {json.dumps({'content': char})}\n\n"
-                                    time.sleep(0.02)  # 每个字符间隔20毫秒
+                                yield f"data: {json.dumps({'content': delta})}\n\n"
                             except json.JSONDecodeError:
-                                logger.warning('Invalid JSON data: %s', decoded_line)
+                                logger.warning('Invalid JSON: %s', decoded)
             except Exception as e:
                 logger.error('Stream error: %s', str(e))
-                yield f"data: {json.dumps({'error': '服务暂时不可用'})}\n\n"
+                yield f"data: {json.dumps({'error': '流式请求失败'})}\n\n"
 
         return StreamingHttpResponse(event_stream(), content_type='text/event-stream')
 
@@ -69,7 +60,3 @@ def stream_chat(request):
         logger.exception('Error in stream_chat')
         return JsonResponse({'error': str(e)}, status=500)
 
-@login_required
-def chat_history(request):
-    """聊天历史（暂时返回空）"""
-    return JsonResponse([], safe=False)
