@@ -148,26 +148,37 @@ async function sendMessage() {
       signal: controller.signal
     });
 
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+const reader = response.body
+  .pipeThrough(new TextDecoderStream())
+  .getReader();
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+let buffer = '';
+while (true) {
+  const { done, value } = await reader.read();
+  if (done) break;
 
-      const data = JSON.parse(value.replace('data: ', ''));
-      if (data.error) {
-        updateMessage(aiMsg, data.error, true);
-        break;
+  buffer += value;
+
+  const lines = buffer.split('\n\n');
+  buffer = lines.pop();  // 最后一行可能是不完整的，留着
+
+  for (const line of lines) {
+    if (line.startsWith('data: ')) {
+      const dataStr = line.slice(6).trim();
+      if (dataStr !== '[DONE]') {
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.content !== undefined) {
+            await typeWriter(aiMsg, parsed.content);
+          }
+        } catch (e) {
+          console.error('JSON Parse Error:', dataStr, e);
+        }
       }
-      await typeWriter(aiMsg, data.content);
     }
-  } catch (err) {
-    console.error(err);
-  } finally {
-    sendBtn.disabled = false;
-    controller = null;
   }
 }
+
 
 function createMessageElement(role, text) {
   const div = document.createElement('div');
