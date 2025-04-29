@@ -71,6 +71,10 @@
 <div id="chat-container">
   <h1>DeepSeek 智能助手</h1>
 
+  <div style="text-align: right;">
+    <button onclick="window.location.reload()">测试</button>
+  </div>
+
   <select class="model-selector" id="model-select">
     <option value="v3">通用聊天模型 (v3)</option>
     <option value="r1">代码助手 (r1)</option>
@@ -81,7 +85,6 @@
   <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
 
   <div style="text-align: right; margin-top: 1rem;">
-    <button onclick="clearChat()">清空历史</button>
     <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
 </div>
@@ -91,14 +94,15 @@ let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
+// 获取CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
     const cookies = document.cookie.split(';');
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i].trim();
-      if (cookie.startsWith(name + '=')) {
-        cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
         break;
       }
     }
@@ -113,16 +117,15 @@ function handleKeydown(event) {
   }
 }
 
-function clearChat() {
-  chatBox.innerHTML = '';
-}
-
 async function sendMessage() {
   const input = document.getElementById('user-input');
   const question = input.value.trim();
   const model = document.getElementById('model-select').value;
 
-  if (!question) return;
+  if (!question) {
+    input.classList.add('error');
+    return;
+  }
 
   sendBtn.disabled = true;
   input.value = '';
@@ -132,12 +135,13 @@ async function sendMessage() {
 
   const aiMsg = createMessageElement('ai', '思考中...');
   chatBox.appendChild(aiMsg);
+
   scrollToBottom();
 
   const csrftoken = getCookie('csrftoken');
 
+  controller = new AbortController();
   try {
-    controller = new AbortController();
     const response = await fetch('/chat/stream/', {
       method: 'POST',
       headers: {
@@ -150,29 +154,19 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let content = '';
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const lines = value.split('\n').filter(l => l.startsWith('data: '));
-      for (const line of lines) {
-        try {
-          const parsed = JSON.parse(line.slice(6));
-          if (parsed.content) {
-            content += parsed.content;
-            updateMessage(aiMsg, content);
-            scrollToBottom();
-          } else if (parsed.error) {
-            updateMessage(aiMsg, `请求失败，请重试。`, true);
-          }
-        } catch (e) {
-          console.warn('JSON Parse Failed:', line);
-        }
+      const data = JSON.parse(value.replace('data: ', ''));
+      if (data.error) {
+        updateMessage(aiMsg, data.error, true);
+        break;
       }
+      await typeWriter(aiMsg, data.content);
     }
   } catch (err) {
-    updateMessage(aiMsg, '请求失败，请重试。', true);
     console.error(err);
   } finally {
     sendBtn.disabled = false;
@@ -214,6 +208,17 @@ function scrollToBottom() {
     chatBox.scrollTop = chatBox.scrollHeight;
   });
 }
+
+async function typeWriter(element, text) {
+  const contentDiv = element.querySelector('.markdown-body');
+  contentDiv.innerHTML = '';
+  for (let i = 0; i < text.length; i++) {
+    contentDiv.innerHTML += text[i];
+    await new Promise(resolve => setTimeout(resolve, 30));
+    scrollToBottom();
+  }
+}
 </script>
+
 </body>
 </html>
