@@ -148,7 +148,7 @@ async function sendMessage() {
         'X-CSRFToken': csrftoken
       },
       body: JSON.stringify({ question, model }),
-      signal: controller.signal
+      signal: controller.signal,
       credentials: 'same-origin'  // ✅ 新增这行！！！
     });
 
