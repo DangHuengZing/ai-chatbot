@@ -90,13 +90,14 @@ let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
+// 获取CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
     const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + '=')) {
         cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
         break;
       }
@@ -148,37 +149,40 @@ async function sendMessage() {
       signal: controller.signal
     });
 
-const reader = response.body
-  .pipeThrough(new TextDecoderStream())
-  .getReader();
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
-let buffer = '';
-while (true) {
-  const { done, value } = await reader.read();
-  if (done) break;
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-  buffer += value;
+      buffer += value;
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop();  // 保持不完整的部分
 
-  const lines = buffer.split('\n\n');
-  buffer = lines.pop();  // 最后一行可能是不完整的，留着
-
-  for (const line of lines) {
-    if (line.startsWith('data: ')) {
-      const dataStr = line.slice(6).trim();
-      if (dataStr !== '[DONE]') {
-        try {
-          const parsed = JSON.parse(dataStr);
-          if (parsed.content !== undefined) {
-            await typeWriter(aiMsg, parsed.content);
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6).trim();
+          if (dataStr && dataStr !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.content !== undefined) {
+                await typeWriter(aiMsg, parsed.content);
+              }
+            } catch (e) {
+              console.warn('JSON parse error:', e);
+            }
           }
-        } catch (e) {
-          console.error('JSON Parse Error:', dataStr, e);
         }
       }
     }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    sendBtn.disabled = false;
+    controller = null;
   }
 }
-
 
 function createMessageElement(role, text) {
   const div = document.createElement('div');
@@ -220,7 +224,7 @@ async function typeWriter(element, text) {
   contentDiv.innerHTML = '';
   for (let i = 0; i < text.length; i++) {
     contentDiv.innerHTML += text[i];
-    await new Promise(resolve => setTimeout(resolve, 30));
+    await new Promise(resolve => setTimeout(resolve, 20)); // 打字速度再顺一点
     scrollToBottom();
   }
 }
