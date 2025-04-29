@@ -24,7 +24,7 @@ def stream_chat(request):
     try:
         body = json.loads(request.body)
         question = body.get('question', '')
-        model = body.get('model', 'v3')  # 默认为v3，如果前端没传就用v3
+        model = body.get('model', 'v3')  # 默认为v3
 
         api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
         headers = {
@@ -53,25 +53,21 @@ def stream_chat(request):
             """流式读取返回内容"""
             try:
                 for line in response.iter_lines(decode_unicode=True):
-                    if line:
-                        line = line.strip()
-                        if line.startswith(":"):
-                            continue  # 💥 忽略掉心跳包
-                        if line.startswith("data: "):
-                            raw_data = line[6:].strip()
-                        else:
-                            raw_data = line
-
-                        if raw_data == '[DONE]':
-                            break
-
-                        try:
-                            parsed = json.loads(raw_data)
-                            delta = parsed['choices'][0]['delta'].get('content', '')
-                            if delta:
-                                yield f"data: {json.dumps({'content': delta})}\n\n"
-                        except json.JSONDecodeError as e:
-                            logger.warning(f"Failed to parse JSON line: {raw_data} Error: {e}")
+                    if not line:
+                        continue
+                    line = line.strip()
+                    if not line.startswith("data: "):
+                        continue  # 🛡️ 忽略无关行
+                    raw_data = line.removeprefix("data: ").strip()
+                    if raw_data == '[DONE]':
+                        break
+                    try:
+                        parsed = json.loads(raw_data)
+                        delta = parsed['choices'][0]['delta'].get('content', '')
+                        if delta:
+                            yield f"data: {json.dumps({'content': delta})}\n\n"
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse JSON line: {raw_data} Error: {e}")
             except Exception as e:
                 logger.error(f"Stream error: {e}")
                 yield f"data: {json.dumps({'error': 'Stream error occurred'})}\n\n"
