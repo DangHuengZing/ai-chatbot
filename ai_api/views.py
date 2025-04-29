@@ -1,73 +1,83 @@
 # ai_api/views.py
-
-from django.shortcuts import render
-from django.http import JsonResponse, StreamingHttpResponse
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
-from django.conf import settings
-import requests
 import json
 import logging
+import requests
+from django.conf import settings
+from django.http import JsonResponse, StreamingHttpResponse
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 
 logger = logging.getLogger(__name__)
 
 @login_required
 def stream_chat_page(request):
     """返回聊天页面"""
-    return render(request, 'ai_api/stream_chat.html')  # ✅ 注意路径是 templates/ai_api/stream_chat.html
+    return render(request, "ai_api/stream_chat.html")
 
 @csrf_exempt
-@login_required
 def stream_chat(request):
     """处理流式聊天请求"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+
     try:
         body = json.loads(request.body)
-        message = body.get('question', '')
-        model_key = body.get('model', 'v3')  # 默认v3
+        question = body.get('question', '')
+        model = body.get('model', 'v3')  # 默认为v3，如果前端没传就用v3
 
-        model_mapping = {
-            'v3': 'deepseek-chat',    # 通用聊天模型
-            'r1': 'deepseek-coder',   # 编码助手模型
-        }
-        model = model_mapping.get(model_key, 'deepseek-chat')  # 映射真实API模型名
-
+        # 构造 DeepSeek API 参数
+        api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
         headers = {
-            'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}'
+            'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
+            'Content-Type': 'application/json'
         }
         payload = {
-            'model': model,
-            'messages': [{'role': 'user', 'content': message}],
+            'model': api_model,
+            'messages': [{'role': 'user', 'content': question}],
             'stream': True
         }
 
+        # 请求 DeepSeek API
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            stream=True,
+            timeout=60
+        )
+
+        # 💥 调试用，打印 DeepSeek返回的状态和内容
+        if response.status_code != 200:
+            logger.error(f"DeepSeek API Error {response.status_code}: {response.text}")
+            return JsonResponse({'error': f"DeepSeek API Error {response.status_code}"}, status=500)
+
         def event_stream():
+            """流式读取返回内容"""
             try:
-                with requests.post(
-                    'https://api.deepseek.com/v1/chat/completions',
-                    headers=headers,
-                    json=payload,
-                    stream=True,
-                    timeout=60
-                ) as response:
-                    response.raise_for_status()
-                    for line in response.iter_lines():
-                        if line:
-                            decoded_line = line.decode('utf-8').lstrip('data: ')
-                            if decoded_line == '[DONE]':
-                                break
-                            try:
-                                data = json.loads(decoded_line)
-                                delta = data['choices'][0]['delta'].get('content', '')
-                                if delta:
-                                    yield f"data: {json.dumps({'content': delta})}\n\n"
-                            except json.JSONDecodeError:
-                                logger.warning('Invalid JSON: %s', decoded_line)
+                for line in response.iter_lines(decode_unicode=True):
+                    if line:
+                        if line.startswith("data: "):
+                            raw_data = line.removeprefix("data: ").strip()
+                        else:
+                            raw_data = line.strip()
+
+                        if raw_data == '[DONE]':
+                            break
+
+                        try:
+                            parsed = json.loads(raw_data)
+                            delta = parsed['choices'][0]['delta'].get('content', '')
+                            if delta:
+                                yield f"data: {json.dumps({'content': delta})}\n\n"
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"Failed to parse JSON line: {raw_data} Error: {e}")
             except Exception as e:
-                logger.error(f"Stream error: {str(e)}")
+                logger.error(f"Stream error: {e}")
                 yield f"data: {json.dumps({'error': 'Stream error occurred'})}\n\n"
 
-        return StreamingHttpResponse(event_stream(), content_type='text/event-stream')
+        return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
 
     except Exception as e:
-        logger.exception('Error in stream_chat')
+        logger.exception(f"Unexpected server error: {e}")
         return JsonResponse({'error': str(e)}, status=500)
