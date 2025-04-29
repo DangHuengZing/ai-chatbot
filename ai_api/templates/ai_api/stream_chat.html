@@ -71,8 +71,9 @@
 <div id="chat-container">
   <h1>DeepSeek 智能助手</h1>
 
+  <!-- 清空聊天记录按钮 -->
   <div style="text-align: right;">
-    <button onclick="window.location.reload()">测试</button>
+    <button onclick="clearChat()">清空聊天记录</button>
   </div>
 
   <select class="model-selector" id="model-select">
@@ -217,6 +218,11 @@ async function typeWriter(element, text) {
     await new Promise(resolve => setTimeout(resolve, 30));
     scrollToBottom();
   }
+}
+
+function clearChat() {
+  document.getElementById('chat-box').innerHTML = '';
+  document.getElementById('user-input').value = '';
 }
 </script>
 
