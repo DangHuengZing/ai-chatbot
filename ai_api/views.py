@@ -11,14 +11,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 @login_required
-def chat_page(request):
+def stream_chat_page(request):
     """返回聊天页面"""
-    return render(request, 'ai_api/chat.html')
+    return render(request, 'ai_api/stream_chat.html')
 
 @csrf_exempt
 @login_required
 def stream_chat(request):
-    """处理流式聊天的后端逻辑"""
+    """处理流式聊天后端逻辑"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST is allowed'}, status=405)
 
