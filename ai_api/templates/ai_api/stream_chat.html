@@ -36,7 +36,12 @@
     }
     .user-message { border-left: 4px solid #4299e1; }
     .ai-message { border-left: 4px solid #48bb78; }
-    .message-header { display: flex; align-items: center; margin-bottom: 0.5rem; color: #4a5568; }
+    .message-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      color: #4a5568;
+    }
     .message-header strong { margin-right: 0.5rem; }
     .timestamp { font-size: 0.8rem; color: #718096; }
     textarea {
@@ -68,13 +73,8 @@
   </style>
 </head>
 <body>
-
 <div id="chat-container">
   <h1>DeepSeek 智能助手</h1>
-
-  <div style="text-align: right;">
-    <button onclick="clearHistory()" style="margin-bottom: 1rem;">清空聊天</button>
-  </div>
 
   <select class="model-selector" id="model-select">
     <option value="v3">通用聊天模型 (v3)</option>
@@ -86,6 +86,7 @@
   <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
 
   <div style="text-align: right; margin-top: 1rem;">
+    <button onclick="clearChat()">清空聊天</button>
     <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
 </div>
@@ -95,7 +96,7 @@ let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
-// 获取CSRF Token
+// 获取 CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -118,15 +119,16 @@ function handleKeydown(event) {
   }
 }
 
+function clearChat() {
+  chatBox.innerHTML = '';
+}
+
 async function sendMessage() {
   const input = document.getElementById('user-input');
   const question = input.value.trim();
   const model = document.getElementById('model-select').value;
 
-  if (!question) {
-    input.classList.add('error');
-    return;
-  }
+  if (!question) return;
 
   sendBtn.disabled = true;
   input.value = '';
@@ -134,9 +136,8 @@ async function sendMessage() {
   const userMsg = createMessageElement('user', question);
   chatBox.appendChild(userMsg);
 
-  const aiMsg = createMessageElement('ai', '');
+  const aiMsg = createMessageElement('ai', '思考中...');
   chatBox.appendChild(aiMsg);
-
   scrollToBottom();
 
   const csrftoken = getCookie('csrftoken');
@@ -155,33 +156,28 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let typingBuffer = '';
+    let fullContent = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      const line = value.trim();
+      if (!line.startsWith('data:')) continue;
 
-      const lines = value.split('\n');
-      for (const line of lines) {
-        if (!line.trim().startsWith('data:')) continue;
-        const raw = line.trim().replace(/^data:\s*/, '');
-        if (!raw || raw === '[DONE]') continue;
-
-        try {
-          const parsed = JSON.parse(raw);
-          if (parsed.content) {
-            typingBuffer += parsed.content;
-            updateMessage(aiMsg, typingBuffer);
-          }
-        } catch (e) {
-          console.warn('JSON Parse Failed:', raw);
-          continue;
-        }
+      const json = JSON.parse(line.slice(5));
+      if (json.error) {
+        updateMessage(aiMsg, json.error, true);
+        break;
       }
+
+      fullContent += json.content;
+      updateMessage(aiMsg, fullContent);
+      scrollToBottom();
     }
+
   } catch (err) {
-    updateMessage(aiMsg, '出错了，请稍后重试。', true);
-    console.error('stream error', err);
+    updateMessage(aiMsg, '请求失败，请重试。', true);
+    console.error(err);
   } finally {
     sendBtn.disabled = false;
     controller = null;
@@ -194,7 +190,10 @@ function createMessageElement(role, text) {
 
   const header = document.createElement('div');
   header.className = 'message-header';
-  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
+  header.innerHTML = `
+    <strong>${role === 'user' ? '您' : 'AI助手'}</strong>
+    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+  `;
 
   const content = document.createElement('div');
   content.className = 'markdown-body';
@@ -213,7 +212,7 @@ function updateMessage(element, content, isError = false) {
 }
 
 function renderMarkdown(text) {
-  const rawHtml = marked.parse(text);
+  const rawHtml = marked.parse(text || '');
   return DOMPurify.sanitize(rawHtml);
 }
 
@@ -222,11 +221,6 @@ function scrollToBottom() {
     chatBox.scrollTop = chatBox.scrollHeight;
   });
 }
-
-function clearHistory() {
-  chatBox.innerHTML = '';
-}
 </script>
-
 </body>
 </html>
