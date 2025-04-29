@@ -36,12 +36,7 @@
     }
     .user-message { border-left: 4px solid #4299e1; }
     .ai-message { border-left: 4px solid #48bb78; }
-    .message-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 0.5rem;
-      color: #4a5568;
-    }
+    .message-header { display: flex; align-items: center; margin-bottom: 0.5rem; color: #4a5568; }
     .message-header strong { margin-right: 0.5rem; }
     .timestamp { font-size: 0.8rem; color: #718096; }
     textarea {
@@ -86,7 +81,7 @@
   <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
 
   <div style="text-align: right; margin-top: 1rem;">
-    <button onclick="clearChat()">清空聊天</button>
+    <button onclick="clearChat()">清空历史</button>
     <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
 </div>
@@ -96,15 +91,14 @@ let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
-// 获取 CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
     const cookies = document.cookie.split(';');
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
         break;
       }
     }
@@ -141,9 +135,9 @@ async function sendMessage() {
   scrollToBottom();
 
   const csrftoken = getCookie('csrftoken');
-  controller = new AbortController();
 
   try {
+    controller = new AbortController();
     const response = await fetch('/chat/stream/', {
       method: 'POST',
       headers: {
@@ -156,25 +150,27 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let fullContent = '';
-
+    let content = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const line = value.trim();
-      if (!line.startsWith('data:')) continue;
 
-      const json = JSON.parse(line.slice(5));
-      if (json.error) {
-        updateMessage(aiMsg, json.error, true);
-        break;
+      const lines = value.split('\n').filter(l => l.startsWith('data: '));
+      for (const line of lines) {
+        try {
+          const parsed = JSON.parse(line.slice(6));
+          if (parsed.content) {
+            content += parsed.content;
+            updateMessage(aiMsg, content);
+            scrollToBottom();
+          } else if (parsed.error) {
+            updateMessage(aiMsg, `请求失败，请重试。`, true);
+          }
+        } catch (e) {
+          console.warn('JSON Parse Failed:', line);
+        }
       }
-
-      fullContent += json.content;
-      updateMessage(aiMsg, fullContent);
-      scrollToBottom();
     }
-
   } catch (err) {
     updateMessage(aiMsg, '请求失败，请重试。', true);
     console.error(err);
@@ -190,10 +186,7 @@ function createMessageElement(role, text) {
 
   const header = document.createElement('div');
   header.className = 'message-header';
-  header.innerHTML = `
-    <strong>${role === 'user' ? '您' : 'AI助手'}</strong>
-    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-  `;
+  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
 
   const content = document.createElement('div');
   content.className = 'markdown-body';
@@ -212,7 +205,7 @@ function updateMessage(element, content, isError = false) {
 }
 
 function renderMarkdown(text) {
-  const rawHtml = marked.parse(text || '');
+  const rawHtml = marked.parse(text);
   return DOMPurify.sanitize(rawHtml);
 }
 
