@@ -130,12 +130,11 @@ async function sendMessage() {
 
   const aiMsg = createMessageElement('ai', '思考中...');
   chatBox.appendChild(aiMsg);
-
   scrollToBottom();
 
   const csrftoken = getCookie('csrftoken');
-
   controller = new AbortController();
+
   try {
     const response = await fetch('/chat/stream/', {
       method: 'POST',
@@ -149,27 +148,33 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let finalContent = '';
-
+    let fullText = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
       const cleanValue = value.trim();
-      if (cleanValue.startsWith('data: ')) {
-        const jsonStr = cleanValue.replace('data: ', '');
+      if (!cleanValue.startsWith('data:')) continue;
+
+      const jsonStr = cleanValue.replace('data:', '').trim();
+      if (!jsonStr) continue;
+
+      try {
         const data = JSON.parse(jsonStr);
         if (data.error) {
           updateMessage(aiMsg, data.error, true);
           break;
         }
-        finalContent += data.content;
-        updateMessage(aiMsg, finalContent);
+        fullText += data.content;
+        updateMessage(aiMsg, fullText);
         scrollToBottom();
+      } catch (e) {
+        console.warn('JSON Parse Failed:', jsonStr);
       }
     }
   } catch (err) {
     console.error(err);
+    updateMessage(aiMsg, '请求失败，请重试。', true);
   } finally {
     sendBtn.disabled = false;
     controller = null;
