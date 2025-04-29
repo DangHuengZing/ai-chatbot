@@ -26,7 +26,6 @@ def stream_chat(request):
         question = body.get('question', '')
         model = body.get('model', 'v3')  # 默认为v3，如果前端没传就用v3
 
-        # 构造 DeepSeek API 参数
         api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
@@ -38,7 +37,6 @@ def stream_chat(request):
             'stream': True
         }
 
-        # 请求 DeepSeek API
         response = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
             headers=headers,
@@ -47,7 +45,6 @@ def stream_chat(request):
             timeout=60
         )
 
-        # 💥 调试用，打印 DeepSeek返回的状态和内容
         if response.status_code != 200:
             logger.error(f"DeepSeek API Error {response.status_code}: {response.text}")
             return JsonResponse({'error': f"DeepSeek API Error {response.status_code}"}, status=500)
@@ -57,10 +54,13 @@ def stream_chat(request):
             try:
                 for line in response.iter_lines(decode_unicode=True):
                     if line:
+                        line = line.strip()
+                        if line.startswith(":"):
+                            continue  # 💥 忽略掉心跳包
                         if line.startswith("data: "):
-                            raw_data = line.removeprefix("data: ").strip()
+                            raw_data = line[6:].strip()
                         else:
-                            raw_data = line.strip()
+                            raw_data = line
 
                         if raw_data == '[DONE]':
                             break
