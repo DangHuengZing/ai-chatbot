@@ -94,9 +94,9 @@ function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
     const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      cookie = cookie.trim();
-      if (cookie.startsWith(name + '=')) {
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
         cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
         break;
       }
@@ -123,13 +123,12 @@ async function sendMessage() {
   }
 
   sendBtn.disabled = true;
-  sendBtn.innerText = "发送中...";
   input.value = '';
 
   const userMsg = createMessageElement('user', question);
   chatBox.appendChild(userMsg);
 
-  const aiMsg = createMessageElement('ai', '');
+  const aiMsg = createMessageElement('ai', '思考中...');
   chatBox.appendChild(aiMsg);
 
   scrollToBottom();
@@ -150,40 +149,27 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let fullContent = '';
 
-    let accumulatedText = '';
-    let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += value;
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop();  // incomplete last part
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const dataStr = line.slice(6).trim();
-          if (dataStr && dataStr !== '[DONE]') {
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.content !== undefined) {
-                accumulatedText += parsed.content;
-                updateMessage(aiMsg, accumulatedText);
-              }
-            } catch (e) {
-              console.warn('JSON parse error:', e);
-            }
-          }
-        }
+      const data = JSON.parse(value.replace('data: ', ''));
+      if (data.error) {
+        updateMessage(aiMsg, data.error, true);
+        break;
       }
+
+      fullContent += data.content;
+      updateMessage(aiMsg, fullContent);
       scrollToBottom();
     }
   } catch (err) {
     console.error(err);
+    updateMessage(aiMsg, "出错了，请稍后重试。", true);
   } finally {
     sendBtn.disabled = false;
-    sendBtn.innerText = "发送";
     controller = null;
   }
 }
