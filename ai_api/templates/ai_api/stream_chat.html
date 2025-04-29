@@ -68,24 +68,34 @@
   </style>
 </head>
 <body>
-  <div id="chat-container">
-    <h1>DeepSeek 智能助手</h1>
-    <select class="model-selector" id="model-select">
-      <option value="v3">通用聊天模型 (v3)</option>
-      <option value="r1">代码助手 (r1)</option>
-    </select>
-    <div id="chat-box"></div>
-    <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
-    <div style="text-align: right; margin-top: 1rem;">
-      <button id="send-btn" onclick="sendMessage()">发送</button>
-    </div>
+
+<div id="chat-container">
+  <h1>DeepSeek 智能助手</h1>
+
+  <div style="text-align: right;">
+    <button onclick="clearHistory()" style="margin-bottom: 1rem;">清空聊天</button>
   </div>
+
+  <select class="model-selector" id="model-select">
+    <option value="v3">通用聊天模型 (v3)</option>
+    <option value="r1">代码助手 (r1)</option>
+  </select>
+
+  <div id="chat-box"></div>
+
+  <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
+
+  <div style="text-align: right; margin-top: 1rem;">
+    <button id="send-btn" onclick="sendMessage()">发送</button>
+  </div>
+</div>
 
 <script>
 let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
+// 获取CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -124,8 +134,9 @@ async function sendMessage() {
   const userMsg = createMessageElement('user', question);
   chatBox.appendChild(userMsg);
 
-  const aiMsg = createMessageElement('ai', '思考中...');
+  const aiMsg = createMessageElement('ai', '');
   chatBox.appendChild(aiMsg);
+
   scrollToBottom();
 
   const csrftoken = getCookie('csrftoken');
@@ -144,7 +155,7 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let fullContent = '';
+    let typingBuffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -155,12 +166,12 @@ async function sendMessage() {
         if (!line.trim().startsWith('data:')) continue;
         const raw = line.trim().replace(/^data:\s*/, '');
         if (!raw || raw === '[DONE]') continue;
-        
+
         try {
           const parsed = JSON.parse(raw);
           if (parsed.content) {
-            fullContent += parsed.content;
-            await typeWriter(aiMsg, fullContent);
+            typingBuffer += parsed.content;
+            updateMessage(aiMsg, typingBuffer);
           }
         } catch (e) {
           console.warn('JSON Parse Failed:', raw);
@@ -183,10 +194,7 @@ function createMessageElement(role, text) {
 
   const header = document.createElement('div');
   header.className = 'message-header';
-  header.innerHTML = `
-    <strong>${role === 'user' ? '您' : 'AI助手'}</strong>
-    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-  `;
+  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
 
   const content = document.createElement('div');
   content.className = 'markdown-body';
@@ -215,10 +223,10 @@ function scrollToBottom() {
   });
 }
 
-async function typeWriter(element, text) {
-  const contentDiv = element.querySelector('.markdown-body');
-  contentDiv.innerHTML = renderMarkdown(text);
+function clearHistory() {
+  chatBox.innerHTML = '';
 }
 </script>
+
 </body>
 </html>
