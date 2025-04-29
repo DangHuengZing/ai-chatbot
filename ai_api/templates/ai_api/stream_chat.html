@@ -149,6 +149,7 @@ async function sendMessage() {
       },
       body: JSON.stringify({ question, model }),
       signal: controller.signal
+      credentials: 'same-origin'  // ✅ 新增这行！！！
     });
 
     const reader = response.body
