@@ -68,22 +68,18 @@
   </style>
 </head>
 <body>
-<div id="chat-container">
-  <h1>DeepSeek 智能助手</h1>
-
-  <select class="model-selector" id="model-select">
-    <option value="v3">通用聊天模型 (v3)</option>
-    <option value="r1">代码助手 (r1)</option>
-  </select>
-
-  <div id="chat-box"></div>
-
-  <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
-
-  <div style="text-align: right; margin-top: 1rem;">
-    <button id="send-btn" onclick="sendMessage()">发送</button>
+  <div id="chat-container">
+    <h1>DeepSeek 智能助手</h1>
+    <select class="model-selector" id="model-select">
+      <option value="v3">通用聊天模型 (v3)</option>
+      <option value="r1">代码助手 (r1)</option>
+    </select>
+    <div id="chat-box"></div>
+    <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
+    <div style="text-align: right; margin-top: 1rem;">
+      <button id="send-btn" onclick="sendMessage()">发送</button>
+    </div>
   </div>
-</div>
 
 <script>
 let controller = null;
@@ -148,33 +144,32 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let fullText = '';
+    let content = '';
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const cleanValue = value.trim();
-      if (!cleanValue.startsWith('data:')) continue;
+      if (!value.trim().startsWith('data:')) continue;
 
-      const jsonStr = cleanValue.replace('data:', '').trim();
-      if (!jsonStr) continue;
+      const raw = value.trim().replace(/^data:\s*/, '');
+      if (!raw || raw === '[DONE]') break;
 
       try {
-        const data = JSON.parse(jsonStr);
-        if (data.error) {
-          updateMessage(aiMsg, data.error, true);
-          break;
+        const json = JSON.parse(raw);
+        if (json.content) {
+          content += json.content;
+          updateMessage(aiMsg, content);
+          scrollToBottom();
         }
-        fullText += data.content;
-        updateMessage(aiMsg, fullText);
-        scrollToBottom();
       } catch (e) {
-        console.warn('JSON Parse Failed:', jsonStr);
+        console.warn('JSON Parse Failed:', raw);
+        continue;
       }
     }
   } catch (err) {
-    console.error(err);
-    updateMessage(aiMsg, '请求失败，请重试。', true);
+    updateMessage(aiMsg, '出错了，请稍后重试。', true);
+    console.error('stream error', err);
   } finally {
     sendBtn.disabled = false;
     controller = null;
@@ -187,7 +182,10 @@ function createMessageElement(role, text) {
 
   const header = document.createElement('div');
   header.className = 'message-header';
-  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
+  header.innerHTML = `
+    <strong>${role === 'user' ? '您' : 'AI助手'}</strong>
+    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
+  `;
 
   const content = document.createElement('div');
   content.className = 'markdown-body';
@@ -216,6 +214,5 @@ function scrollToBottom() {
   });
 }
 </script>
-
 </body>
 </html>
