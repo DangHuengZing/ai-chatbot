@@ -1,32 +1,36 @@
 # ai_api/views.py
-
-from django.conf import settings
 from django.shortcuts import render
-from django.http import JsonResponse, StreamingHttpResponse
+from django.conf import settings
+from django.http import StreamingHttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
+import requests
 import json
 import logging
-import requests
 
 logger = logging.getLogger(__name__)
 
 @login_required
 def chat_page(request):
-    """返回聊天HTML页面"""
-    return render(request, 'ai_api/stream_chat.html')
+    """返回聊天页面"""
+    return render(request, 'ai_api/chat.html')
 
+@csrf_exempt
 @login_required
 def stream_chat(request):
-    """处理流式聊天"""
+    """处理流式聊天的后端逻辑"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST is allowed'}, status=405)
+
     try:
         body = json.loads(request.body)
-        message = body.get('question', '')
-        model_type = body.get('model', 'v3')  # 默认使用 v3
+        question = body.get('question', '')
+        model = body.get('model', 'v3')
 
         headers = {'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}'}
         payload = {
-            'model': 'deepseek-chat' if model_type == 'v3' else 'deepseek-coder',
-            'messages': [{'role': 'user', 'content': message}],
+            'model': f'deepseek-chat-{model}',
+            'messages': [{'role': 'user', 'content': question}],
             'stream': True
         }
 
@@ -50,16 +54,16 @@ def stream_chat(request):
                                 data = json.loads(decoded_line)
                                 delta = data['choices'][0]['delta'].get('content', '')
                                 if delta:
-                                    yield f"data: {json.dumps({'content': delta})}\n\n"
+                                    yield f'data: {json.dumps({"content": delta})}\n\n'
                             except json.JSONDecodeError:
-                                logger.warning('Invalid JSON data: %s', decoded_line)
+                                logger.warning('Invalid JSON line: %s', decoded_line)
 
             except Exception as e:
-                logger.error('Stream error: %s', str(e))
-                yield f"data: {json.dumps({'error': '服务暂时不可用'})}\n\n"
+                logger.error('Streaming error: %s', str(e))
+                yield f'data: {json.dumps({"error": "出错了，请稍后再试。"})}\n\n'
 
         return StreamingHttpResponse(event_stream(), content_type='text/event-stream')
 
     except Exception as e:
-        logger.exception('Error in stream_chat')
+        logger.exception('Stream Chat Error')
         return JsonResponse({'error': str(e)}, status=500)
