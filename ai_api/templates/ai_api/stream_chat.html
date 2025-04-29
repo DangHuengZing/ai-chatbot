@@ -90,7 +90,6 @@ let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
-// 获取CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -124,6 +123,7 @@ async function sendMessage() {
   }
 
   sendBtn.disabled = true;
+  sendBtn.innerText = "发送中...";
   input.value = '';
 
   const userMsg = createMessageElement('user', question);
@@ -151,6 +151,7 @@ async function sendMessage() {
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
+    let accumulatedText = '';
     let buffer = '';
     while (true) {
       const { done, value } = await reader.read();
@@ -158,7 +159,7 @@ async function sendMessage() {
 
       buffer += value;
       const lines = buffer.split('\n\n');
-      buffer = lines.pop();  // 保持不完整的部分
+      buffer = lines.pop();  // incomplete last part
 
       for (const line of lines) {
         if (line.startsWith('data: ')) {
@@ -167,7 +168,8 @@ async function sendMessage() {
             try {
               const parsed = JSON.parse(dataStr);
               if (parsed.content !== undefined) {
-                await typeWriter(aiMsg, parsed.content);
+                accumulatedText += parsed.content;
+                updateMessage(aiMsg, accumulatedText);
               }
             } catch (e) {
               console.warn('JSON parse error:', e);
@@ -175,11 +177,13 @@ async function sendMessage() {
           }
         }
       }
+      scrollToBottom();
     }
   } catch (err) {
     console.error(err);
   } finally {
     sendBtn.disabled = false;
+    sendBtn.innerText = "发送";
     controller = null;
   }
 }
@@ -217,16 +221,6 @@ function scrollToBottom() {
   requestAnimationFrame(() => {
     chatBox.scrollTop = chatBox.scrollHeight;
   });
-}
-
-async function typeWriter(element, text) {
-  const contentDiv = element.querySelector('.markdown-body');
-  contentDiv.innerHTML = '';
-  for (let i = 0; i < text.length; i++) {
-    contentDiv.innerHTML += text[i];
-    await new Promise(resolve => setTimeout(resolve, 20)); // 打字速度再顺一点
-    scrollToBottom();
-  }
 }
 </script>
 
