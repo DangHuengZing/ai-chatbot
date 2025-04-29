@@ -149,25 +149,27 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let fullContent = '';
+    let finalContent = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const data = JSON.parse(value.replace('data: ', ''));
-      if (data.error) {
-        updateMessage(aiMsg, data.error, true);
-        break;
+      const cleanValue = value.trim();
+      if (cleanValue.startsWith('data: ')) {
+        const jsonStr = cleanValue.replace('data: ', '');
+        const data = JSON.parse(jsonStr);
+        if (data.error) {
+          updateMessage(aiMsg, data.error, true);
+          break;
+        }
+        finalContent += data.content;
+        updateMessage(aiMsg, finalContent);
+        scrollToBottom();
       }
-
-      fullContent += data.content;
-      updateMessage(aiMsg, fullContent);
-      scrollToBottom();
     }
   } catch (err) {
     console.error(err);
-    updateMessage(aiMsg, "出错了，请稍后重试。", true);
   } finally {
     sendBtn.disabled = false;
     controller = null;
