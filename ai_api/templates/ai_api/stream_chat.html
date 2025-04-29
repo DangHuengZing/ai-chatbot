@@ -144,27 +144,28 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-    let content = '';
+    let fullContent = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      if (!value.trim().startsWith('data:')) continue;
-
-      const raw = value.trim().replace(/^data:\s*/, '');
-      if (!raw || raw === '[DONE]') break;
-
-      try {
-        const json = JSON.parse(raw);
-        if (json.content) {
-          content += json.content;
-          updateMessage(aiMsg, content);
-          scrollToBottom();
+      const lines = value.split('\n');
+      for (const line of lines) {
+        if (!line.trim().startsWith('data:')) continue;
+        const raw = line.trim().replace(/^data:\s*/, '');
+        if (!raw || raw === '[DONE]') continue;
+        
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.content) {
+            fullContent += parsed.content;
+            await typeWriter(aiMsg, fullContent);
+          }
+        } catch (e) {
+          console.warn('JSON Parse Failed:', raw);
+          continue;
         }
-      } catch (e) {
-        console.warn('JSON Parse Failed:', raw);
-        continue;
       }
     }
   } catch (err) {
@@ -212,6 +213,11 @@ function scrollToBottom() {
   requestAnimationFrame(() => {
     chatBox.scrollTop = chatBox.scrollHeight;
   });
+}
+
+async function typeWriter(element, text) {
+  const contentDiv = element.querySelector('.markdown-body');
+  contentDiv.innerHTML = renderMarkdown(text);
 }
 </script>
 </body>
