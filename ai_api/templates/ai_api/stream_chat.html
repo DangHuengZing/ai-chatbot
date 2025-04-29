@@ -68,29 +68,28 @@
   </style>
 </head>
 <body>
-  <div id="chat-container">
-    <h1>DeepSeek 智能助手</h1>
+<div id="chat-container">
+  <h1>DeepSeek 智能助手</h1>
 
-    <select class="model-selector" id="model-select">
-      <option value="v3">通用聊天模型 (v3)</option>
-      <option value="r1">代码助手 (r1)</option>
-    </select>
+  <select class="model-selector" id="model-select">
+    <option value="v3">通用聊天模型 (v3)</option>
+    <option value="r1">代码助手 (r1)</option>
+  </select>
 
-    <div id="chat-box"></div>
+  <div id="chat-box"></div>
 
-    <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
+  <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
 
-    <div style="text-align: right; margin-top: 1rem;">
-      <button id="send-btn" onclick="sendMessage()">发送</button>
-    </div>
+  <div style="text-align: right; margin-top: 1rem;">
+    <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
+</div>
 
 <script>
 let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
-// 获取CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -126,31 +125,30 @@ async function sendMessage() {
   sendBtn.disabled = true;
   input.value = '';
 
+  const userMsg = createMessageElement('user', question);
+  chatBox.appendChild(userMsg);
+
+  const aiMsg = createMessageElement('ai', '');
+  chatBox.appendChild(aiMsg);
+
+  scrollToBottom();
+
+  const csrftoken = getCookie('csrftoken');
+
+  controller = new AbortController();
   try {
-    const userMsg = createMessageElement('user', question);
-    chatBox.appendChild(userMsg);
-
-    const aiMsg = createMessageElement('ai', '');
-    chatBox.appendChild(aiMsg);
-    scrollToBottom();
-
-    const csrftoken = getCookie('csrftoken');
-
-    controller = new AbortController();
     const response = await fetch('/chat/stream/', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrftoken
       },
+      credentials: 'same-origin',
       body: JSON.stringify({ question, model }),
-      signal: controller.signal,
-      credentials: 'same-origin'  // ✅ 新增这行！！！
+      signal: controller.signal
     });
 
-    const reader = response.body
-      .pipeThrough(new TextDecoderStream())
-      .getReader();
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
     while (true) {
       const { done, value } = await reader.read();
@@ -161,7 +159,6 @@ async function sendMessage() {
         updateMessage(aiMsg, data.error, true);
         break;
       }
-      // 打字机效果输出
       await typeWriter(aiMsg, data.content);
     }
   } catch (err) {
@@ -178,10 +175,7 @@ function createMessageElement(role, text) {
 
   const header = document.createElement('div');
   header.className = 'message-header';
-  header.innerHTML = `
-    <strong>${role === 'user' ? '您' : 'AI助手'}</strong>
-    <span class="timestamp">${new Date().toLocaleTimeString()}</span>
-  `;
+  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
 
   const content = document.createElement('div');
   content.className = 'markdown-body';
@@ -194,9 +188,9 @@ function createMessageElement(role, text) {
 
 function updateMessage(element, content, isError = false) {
   const contentDiv = element.querySelector('.markdown-body');
-  contentDiv.innerHTML = isError ?
-    `<span style="color: #e53e3e;">${content}</span>` :
-    renderMarkdown(content);
+  contentDiv.innerHTML = isError
+    ? `<span style="color: #e53e3e;">${content}</span>`
+    : renderMarkdown(content);
 }
 
 function renderMarkdown(text) {
@@ -212,10 +206,10 @@ function scrollToBottom() {
 
 async function typeWriter(element, text) {
   const contentDiv = element.querySelector('.markdown-body');
-  contentDiv.innerHTML = '';  // 清空
+  contentDiv.innerHTML = '';
   for (let i = 0; i < text.length; i++) {
     contentDiv.innerHTML += text[i];
-    await new Promise(resolve => setTimeout(resolve, 30)); // 打字速度
+    await new Promise(resolve => setTimeout(resolve, 30));
     scrollToBottom();
   }
 }
