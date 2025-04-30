@@ -1,3 +1,4 @@
+<!-- templates/ai_api/stream_chat.html -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -71,7 +72,6 @@
 <div id="chat-container">
   <h1>DeepSeek 智能助手</h1>
 
-  <!-- 清空聊天记录按钮 -->
   <div style="text-align: right;">
     <button onclick="clearChat()">清空聊天记录</button>
   </div>
@@ -95,7 +95,6 @@ let controller = null;
 const chatBox = document.getElementById('chat-box');
 const sendBtn = document.getElementById('send-btn');
 
-// 获取CSRF Token
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -136,12 +135,11 @@ async function sendMessage() {
 
   const aiMsg = createMessageElement('ai', '思考中...');
   chatBox.appendChild(aiMsg);
-
   scrollToBottom();
 
   const csrftoken = getCookie('csrftoken');
-
   controller = new AbortController();
+
   try {
     const response = await fetch('/chat/stream/', {
       method: 'POST',
@@ -155,20 +153,44 @@ async function sendMessage() {
     });
 
     const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = '';
+    let fullContent = '';
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const data = JSON.parse(value.replace('data: ', ''));
-      if (data.error) {
-        updateMessage(aiMsg, data.error, true);
-        break;
+      buffer += value;
+      const lines = buffer.split('\n\n');
+
+      for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i].trim();
+        if (!line.startsWith('data: ')) continue;
+
+        const raw = line.replace('data: ', '').trim();
+        if (raw === '[DONE]') break;
+
+        try {
+          const data = JSON.parse(raw);
+          if (data.error) {
+            updateMessage(aiMsg, data.error, true);
+            return;
+          }
+          fullContent += data.content;
+          updateMessage(aiMsg, fullContent);
+        } catch (err) {
+          console.error('解析错误:', err, raw);
+          updateMessage(aiMsg, '⚠️ 解析失败', true);
+          return;
+        }
       }
-      await typeWriter(aiMsg, data.content);
+
+      buffer = lines[lines.length - 1];
     }
+
   } catch (err) {
     console.error(err);
+    updateMessage(aiMsg, `请求失败，请重试。`, true);
   } finally {
     sendBtn.disabled = false;
     controller = null;
@@ -197,6 +219,7 @@ function updateMessage(element, content, isError = false) {
   contentDiv.innerHTML = isError
     ? `<span style="color: #e53e3e;">${content}</span>`
     : renderMarkdown(content);
+  scrollToBottom();
 }
 
 function renderMarkdown(text) {
@@ -210,21 +233,10 @@ function scrollToBottom() {
   });
 }
 
-async function typeWriter(element, text) {
-  const contentDiv = element.querySelector('.markdown-body');
-  contentDiv.innerHTML = '';
-  for (let i = 0; i < text.length; i++) {
-    contentDiv.innerHTML += text[i];
-    await new Promise(resolve => setTimeout(resolve, 30));
-    scrollToBottom();
-  }
-}
-
 function clearChat() {
   document.getElementById('chat-box').innerHTML = '';
   document.getElementById('user-input').value = '';
 }
 </script>
-
 </body>
 </html>
