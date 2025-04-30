@@ -1,0 +1,26 @@
+[2025-04-30 03:45:25 +0000] [436814] [INFO] Starting gunicorn 23.0.0
+[2025-04-30 03:45:25 +0000] [436814] [INFO] Listening at: http://127.0.0.1:8001 (436814)
+[2025-04-30 03:45:25 +0000] [436814] [INFO] Using worker: sync
+[2025-04-30 03:45:25 +0000] [436817] [INFO] Booting worker with pid: 436817
+Not Found: /apple-touch-icon-precomposed.png
+Not Found: /apple-touch-icon.png
+Not Found: /favicon.ico
+Not Found: /
+Not Found: /robots.txt
+Not Found: /sitemap.xml
+Not Found: /.well-known/security.txt
+Not Found: /favicon.ico
+Not Found: /
+Not Found: /
+Not Found: /
+Not Found: /favicon.ico
+Not Found: /sitemap.xml
+Not Found: /robots.txt
+Not Found: /ReportServer
+Not Found: /api/v1/settings
+Not Found: /.env
+Not Found: /
+Not Found: /
+Not Found: /.git/index
+Not Found: /boaform/admin/formLogin
+Not Found: /
