@@ -1,4 +1,3 @@
-# ai_api/views.py
 import json
 import logging
 import requests
@@ -12,10 +11,12 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def stream_chat_page(request):
+    """返回聊天页面"""
     return render(request, "ai_api/stream_chat.html")
 
 @csrf_exempt
 def stream_chat(request):
+    """处理流式聊天请求"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
@@ -24,9 +25,8 @@ def stream_chat(request):
         question = body.get('question', '')
         model = body.get('model', 'v3')
 
-        # ✅ 修正模型名称
+        # 选择 DeepSeek 模型
         api_model = "deepseek-chat" if model == "v3" else "deepseek-reasoner"
-
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json'
@@ -37,6 +37,7 @@ def stream_chat(request):
             'stream': True
         }
 
+        # 发送请求到 DeepSeek API
         response = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
             headers=headers,
@@ -45,6 +46,7 @@ def stream_chat(request):
             timeout=60
         )
 
+        # 检查 API 响应状态
         if response.status_code != 200:
             logger.error(f"DeepSeek API Error {response.status_code}: {response.text}")
             error_msg = f"DeepSeek API Error {response.status_code}: {response.text}"
@@ -54,13 +56,14 @@ def stream_chat(request):
             )
 
         def event_stream():
+            """流式读取 DeepSeek API 返回内容，并转发给前端"""
             try:
                 for line in response.iter_lines(decode_unicode=True):
                     if not line:
                         continue
                     line = line.strip()
                     if not line.startswith("data: "):
-                        continue
+                        continue  # 忽略无关行
                     raw_data = line.removeprefix("data: ").strip()
                     if raw_data == '[DONE]':
                         break
@@ -70,7 +73,7 @@ def stream_chat(request):
                         if delta:
                             yield f"data: {json.dumps({'content': delta})}\n\n"
                     except json.JSONDecodeError as e:
-                        logger.warning(f"Failed to parse JSON: {raw_data} Error: {e}")
+                        logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received from API'})}\n\n"
                         break
             except Exception as e:
