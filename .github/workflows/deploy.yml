@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main  # 当推送到 main 分支时触发
+      - main  # 当推送到 main 分支时触发 2025年5月2日16:51更新
 
 jobs:
   deploy:
