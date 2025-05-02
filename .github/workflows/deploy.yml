@@ -20,6 +20,13 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+    - name: Debug SSH connection
+      run: |
+        ssh -v -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
+          # Debug commands here
+          echo "SSH connection test"
+        EOF
+
     # Deploy your code via SSH
     - name: Deploy to Server
       run: |
