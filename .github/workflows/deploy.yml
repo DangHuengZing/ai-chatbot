@@ -31,7 +31,7 @@ jobs:
     - name: Deploy to Server
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-          cd /path/to/your/project
+          cd ～/ai_project
           git pull origin main
           source venv/bin/activate
           # Restart the application or server as needed (e.g. Gunicorn)
