@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main  # 当推送到 main 分支时触发 更新密钥
+      - main  # 当推送到 main 分支时触发
 
 jobs:
   deploy:
@@ -20,20 +20,21 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+    # Debug SSH connection
     - name: Debug SSH connection
       run: |
+        echo "Checking if SSH connection works..."
         ssh -v -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-          # Debug commands here
-          echo "SSH connection test"
+          echo "SSH connection test - success"
         EOF
 
     # Deploy your code via SSH
     - name: Deploy to Server
       run: |
+        echo "Deploying to server..."
         ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-          cd ～/ai_project
+          cd /path/to/your/project  # 请确保这个路径是正确的
           git pull origin main
           source venv/bin/activate
-          # Restart the application or server as needed (e.g. Gunicorn)
-          sudo systemctl restart gunicorn
+          sudo systemctl restart gunicorn  # 如果出现权限问题，确认是否需要配置 sudo 权限
         EOF
