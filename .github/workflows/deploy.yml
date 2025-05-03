@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main  # 每次推送到 main 分支时触发部署
+      - main  # 推送到 main 分支时触发
 
 jobs:
   deploy:
@@ -18,13 +18,15 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Deploy to Server
+    - name: Deploy to Server via SSH
       run: |
         ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
           cd ~/ai_project
+          echo "[部署开始] $(date)" >> deploy.log
           git reset --hard
           git clean -fd
           git pull origin main --force
           source venv/bin/activate
           sudo systemctl restart gunicorn
+          echo "[部署成功] $(date)" >> deploy.log
         EOF
