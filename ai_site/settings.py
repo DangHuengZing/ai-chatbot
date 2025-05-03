@@ -57,10 +57,21 @@ TEMPLATES = [
 WSGI_APPLICATION = 'ai_site.wsgi.application'
 
 # Database settings for SQLite
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.sqlite3',
+#        'NAME': BASE_DIR / 'db.sqlite3',
+#    }
+#}
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'ai_project',
+        'USER': 'ai_project',
+        'PASSWORD': 'DarkDang19831109',
+        'HOST': 'localhost',  # 如果数据库在本地
+        'PORT': '5432',  # 默认端口
     }
 }
 
