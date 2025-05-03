@@ -3,38 +3,28 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main  # 当推送到 main 分支时触发
+      - main  # 每次推送到 main 分支时触发部署
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # Checkout the repository code
     - name: Checkout code
       uses: actions/checkout@v2
 
-    # Set up SSH to your server (using secrets for security)
     - name: Set up SSH
       uses: webfactory/ssh-agent@v0.5.3
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    # Debug SSH connection
-    - name: Debug SSH connection
-      run: |
-        echo "Checking if SSH connection works..."
-        ssh -v -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-          echo "SSH connection test - success"
-        EOF
-
-    # Deploy your code via SSH
     - name: Deploy to Server
       run: |
-        echo "Deploying to server..."
         ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-          cd /path/to/your/project  # 请确保这个路径是正确的
-          git pull origin main
+          cd ~/ai_project
+          git reset --hard
+          git clean -fd
+          git pull origin main --force
           source venv/bin/activate
-          sudo systemctl restart gunicorn  # 如果出现权限问题，确认是否需要配置 sudo 权限
+          sudo systemctl restart gunicorn
         EOF
