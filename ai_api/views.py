@@ -17,7 +17,10 @@ def stream_chat_page(request):
     """返回聊天页面"""
     return render(request, "ai_api/stream_chat.html")
 
+from django.contrib.auth.decorators import login_required
+
 # 流式聊天的处理
+@login_required
 @csrf_exempt
 def stream_chat(request):
     """处理流式聊天请求"""
@@ -114,6 +117,7 @@ def stream_chat(request):
             iter([f"data: {json.dumps({'error': str(e)})}\n\n"]),
             content_type="text/event-stream"
         )
+
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
