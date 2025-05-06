@@ -1,5 +1,3 @@
-# ai_api/views.py
-
 import json
 import logging
 import requests
