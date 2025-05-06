@@ -21,6 +21,31 @@ def stream_chat_page(request):
         'username': request.user.username
     })
 
+# 用户登录视图
+@csrf_exempt
+def login_user(request):
+    """处理用户登录"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+
+    try:
+        body = json.loads(request.body)
+        username = body.get('username')
+        password = body.get('password')
+
+        # 验证用户
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            # 登录成功
+            login(request, user)
+            return JsonResponse({'success': True}, status=200)
+        else:
+            # 用户名或密码错误
+            return JsonResponse({'error': '用户名或密码错误，请重新尝试'}, status=400)
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
 # 流式聊天的处理
 @login_required
 @csrf_exempt
@@ -119,28 +144,3 @@ def stream_chat(request):
             iter([f"data: {json.dumps({'error': str(e)})}\n\n"]),
             content_type="text/event-stream"
         )
-
-# 用户登录视图
-@csrf_exempt
-def login_user(request):
-    """处理用户登录"""
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Invalid method'}, status=405)
-
-    try:
-        body = json.loads(request.body)
-        username = body.get('username')
-        password = body.get('password')
-
-        # 验证用户
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            # 登录成功
-            login(request, user)
-            return JsonResponse({'message': 'Login successful'}, status=200)
-        else:
-            # 用户名或密码错误
-            return JsonResponse({'error': '用户名或密码错误，请重新尝试'}, status=400)
-
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
