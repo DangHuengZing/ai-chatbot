@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>登录</title>
     <style>
         body {
             background-color: #222;
@@ -77,26 +77,41 @@
 </head>
 <body>
     <div class="login-container">
-        <h2>Login</h2>
+        <h2>登录</h2>
         <div id="error-message"></div>
         <form method="post" id="login-form">
             {% csrf_token %}
             <div class="form-group">
-                <input type="text" name="username" id="username" placeholder="Username" required>
+                <input type="text" name="username" id="username" placeholder="用户名" required>
             </div>
             <div class="form-group">
-                <input type="password" name="password" id="password" placeholder="Password" required>
+                <input type="password" name="password" id="password" placeholder="密码" required>
             </div>
             <div class="form-group">
-                <input type="submit" value="Login">
+                <input type="submit" value="登录">
             </div>
         </form>
         <div class="footer">
-            <p>Don't have an account? <a href="#">Sign Up</a></p>
+            <p>没有账户？<a href="#">注册</a></p>
         </div>
     </div>
 
     <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
         const form = document.getElementById('login-form');
         const errorMessage = document.getElementById('error-message');
 
@@ -104,7 +119,14 @@
             e.preventDefault();
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const csrftoken = getCookie('csrftoken');
+
+            if (!csrftoken) {
+                console.error('CSRF token not found');
+                errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
+                errorMessage.style.display = 'block';
+                return;
+            }
 
             try {
                 const response = await fetch('/login/', {
@@ -119,15 +141,14 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    // 登录成功，跳转到聊天界面
-                    window.location.href = "/stream_chat/";
+                    window.location.href = '/stream_chat/';
                 } else {
-                    // 显示错误信息
-                    errorMessage.innerHTML = result.error || '未知错误';
+                    errorMessage.textContent = result.error || '登录失败';
                     errorMessage.style.display = 'block';
                 }
             } catch (err) {
-                errorMessage.innerHTML = '登录失败，请重试';
+                console.error('登录错误:', err);
+                errorMessage.textContent = '网络错误，请稍后重试';
                 errorMessage.style.display = 'block';
             }
         });
