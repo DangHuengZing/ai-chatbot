@@ -133,68 +133,157 @@ async function loginUser() {
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrftoken
-      
-```python
-from django.urls import path
-from . import views
+      },
+      body: JSON.stringify({ username, password })
+    });
 
-urlpatterns = [
-    path('login/', views.login_view, name='login'),
-    path('stream_chat/', views.stream_chat, name='stream_chat'),
-]
-```
+    const result = await response.json();
 
-### Backend Code (Django Views)
+    if (result.success) {
+      // 成功登录，显示聊天界面
+      document.getElementById('login-container').style.display = 'none';
+      document.getElementById('chat-container').style.display = 'block';
+    } else {
+      // 显示错误信息
+      errorMessage.innerHTML = result.error || '未知错误';
+      errorMessage.style.display = 'block';
+    }
+  } catch (err) {
+    errorMessage.innerHTML = '登录失败，请重试';
+    errorMessage.style.display = 'block';
+  }
+}
 
-Assuming you have a Django backend, here's how you might structure the views to handle the login and chat functionality. This is provided as a reference since the frontend code interacts with these endpoints.
+function handleKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
+  }
+}
 
-<xaiArtifact artifact_id="fa15d69e-abd3-4cbe-af4c-02cf67dda7d0" artifact_version_id="4eeb2d45-7b28-4bbd-b815-afa69e42edb7" title="views.py" contentType="text/python">
-from django.http import JsonResponse, StreamingHttpResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import authenticate, login
-import json
-import time
+async function sendMessage() {
+  const input = document.getElementById('user-input');
+  const question = input.value.trim();
+  const model = document.getElementById('model-select').value;
 
-@csrf_exempt
-def login_view(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            username = data.get('username')
-            password = data.get('password')
-            user = authenticate(request, username=username, password=password)
-            if user is not None:
-                login(request, user)
-                return JsonResponse({'success': True})
-            else:
-                return JsonResponse({'error': 'Invalid credentials'}, status=400)
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+  if (!question) {
+    input.classList.add('error');
+    return;
+  }
 
-@csrf_exempt
-def stream_chat(request):
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            question = data.get('question')
-            model = data.get('model')
+  sendBtn.disabled = true;
+  input.value = '';
 
-            def stream_response():
-                # Simulated streaming response
-                response_chunks = [
-                    "这是",
-                    "一个",
-                    "流式",
-                    "响应",
-                    "示例。"
-                ]
-                for chunk in response_chunks:
-                    yield json.dumps({'content': chunk}) + '\n\n'
-                    time.sleep(0.5)  # Simulate delay
-                yield 'data: [DONE]\n\n'
+  const userMsg = createMessageElement('user', question);
+  chatBox.appendChild(userMsg);
 
-            return StreamingHttpResponse(stream_response(), content_type='text/event-stream')
-        except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+  const aiMsg = createMessageElement('ai', '思考中...');
+  chatBox.appendChild(aiMsg);
+
+  scrollToBottom();
+
+  const csrftoken = getCookie('csrftoken');
+
+  controller = new AbortController();
+  try {
+    const response = await fetch('/chat/stream/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrftoken
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ question, model }),
+      signal: controller.signal
+    });
+
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+    let buffer = ''; // 用于累积流式数据
+    let currentContent = ''; // 用于存储当前完整内容
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += value;
+      const lines = buffer.split('\n\n'); // 根据流数据分割
+
+      for (let i = 0; i < lines.length - 1; i++) {
+        const line = lines[i].trim();
+        if (!line.startsWith('data: ')) continue;
+
+        const rawData = line.replace('data: ', '').trim();
+        if (rawData === '[DONE]') break;
+
+        try {
+          const data = JSON.parse(rawData);
+          if (data.error) {
+            updateMessage(aiMsg, data.error, true);
+            break;
+          }
+          // 逐步更新内容
+          currentContent += data.content;
+          updateMessage(aiMsg, currentContent);
+          await new Promise(resolve => setTimeout(resolve, 30)); // 延时模拟打字效果
+        } catch (e) {
+          console.error('Failed to parse JSON:', rawData, e);
+          updateMessage(aiMsg, '⚠️ 解析失败', true);
+          break;
+        }
+      }
+
+      buffer = lines[lines.length - 1];
+    }
+  } catch (err) {
+    console.error(err);
+    updateMessage(aiMsg, `请求失败，请重试。`, true);
+  } finally {
+    sendBtn.disabled = false;
+    controller = null;
+  }
+}
+
+function createMessageElement(role, text) {
+  const div = document.createElement('div');
+  div.className = `message ${role}-message`;
+
+  const header = document.createElement('div');
+  header.className = 'message-header';
+  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
+
+  const content = document.createElement('div');
+  content.className = 'markdown-body';
+  content.innerHTML = renderMarkdown(text);
+
+  div.appendChild(header);
+  div.appendChild(content);
+  return div;
+}
+
+function updateMessage(element, content, isError = false) {
+  const contentDiv = element.querySelector('.markdown-body');
+  contentDiv.innerHTML = isError
+    ? `<span style="color: #e53e3e;">${content}</span>`
+    : renderMarkdown(content);
+  scrollToBottom();
+}
+
+function renderMarkdown(text) {
+  const rawHtml = marked.parse(text);
+  return DOMPurify.sanitize(rawHtml);
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    chatBox.scrollTop = chatBox.scrollHeight;
+  });
+}
+
+function clearChat() {
+  document.getElementById('chat-box').innerHTML = '';
+  document.getElementById('user-input').value = '';
+}
+</script>
+</body>
+</html>
