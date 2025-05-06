@@ -1,12 +1,15 @@
+# ai_api/views.py
+
 import json
 import logging
 import requests
 from django.conf import settings
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
+from .models import ChatMessage  # 导入 ChatMessage 模型
 
 logger = logging.getLogger(__name__)
 
@@ -16,40 +19,44 @@ def login_user(request):
         logger.info("Rendering login.html")
         return render(request, 'ai_api/login.html')
     
-    if request.method != 'POST':
-        logger.error(f"Invalid method: {request.method}")
-        return JsonResponse({'error': 'Invalid method'}, status=405)
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body)
+            username = body.get('username')
+            password = body.get('password')
 
-    try:
-        body = json.loads(request.body)
-        username = body.get('username')
-        password = body.get('password')
+            if not username or not password:
+                logger.warning("Missing username or password")
+                return JsonResponse({'error': '用户名和密码不能为空'}, status=400)
 
-        if not username or not password:
-            logger.warning("Missing username or password")
-            return JsonResponse({'error': '用户名和密码不能为空'}, status=400)
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                logger.info(f"User {username} logged in successfully")
+                return JsonResponse({'success': True}, status=200)
+            else:
+                logger.warning(f"Authentication failed for username: {username}")
+                return JsonResponse({'error': '用户名或密码错误'}, status=400)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in request body")
+            return JsonResponse({'error': '无效的请求数据'}, status=400)
+        except Exception as e:
+            logger.error(f"Login error: {e}")
+            return JsonResponse({'error': str(e)}, status=500)
 
-        user = authenticate(request, username=username, password=password)
-        if user is not None:
-            login(request, user)
-            logger.info(f"User {username} logged in successfully")
-            return JsonResponse({'success': True}, status=200)
-        else:
-            logger.warning(f"Authentication failed for username: {username}")
-            return JsonResponse({'error': '用户名或密码错误'}, status=400)
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON in request body")
-        return JsonResponse({'error': '无效的请求数据'}, status=400)
-    except Exception as e:
-        logger.error(f"Login error: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+def logout_user(request):
+    """用户登出"""
+    logout(request)
+    return redirect('login')
 
 @login_required
 def stream_chat_page(request):
-    """返回聊天页面"""
+    """返回聊天页面，并显示历史记录"""
     logger.info(f"Rendering stream_chat.html for user {request.user.username}")
+    chat_history = ChatMessage.objects.filter(user=request.user).order_by('-timestamp')[:10]
     return render(request, 'ai_api/stream_chat.html', {
-        'username': request.user.username
+        'username': request.user.username,
+        'chat_history': chat_history
     })
 
 @login_required
@@ -123,6 +130,8 @@ def stream_chat(request):
                         delta = parsed['choices'][0]['delta'].get('content', '')
                         if delta:
                             yield f"data: {json.dumps({'content': delta})}\n\n"
+                            # 保存聊天记录到数据库
+                            ChatMessage.objects.create(user=request.user, model_type=model, role='user', content=delta, is_stream=True)
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
