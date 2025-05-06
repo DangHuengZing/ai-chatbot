@@ -14,8 +14,11 @@ logger = logging.getLogger(__name__)
 # 聊天页面视图（需要登录）
 @login_required
 def stream_chat_page(request):
-    """返回聊天页面"""
-    return render(request, "ai_api/stream_chat.html")
+    """返回聊天页面，并传递当前用户信息"""
+    logger.info("Rendering stream_chat.html with updated content")  # 确认加载最新模板
+    return render(request, "ai_api/stream_chat.html", {
+        'username': request.user.username
+    })
 
 from django.contrib.auth.decorators import login_required
 
