@@ -1,18 +1,5 @@
-import json
-import logging
-import requests
-from django.conf import settings
-from django.http import JsonResponse, StreamingHttpResponse
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
-
-logger = logging.getLogger(__name__)
-
-@login_required
-def stream_chat_page(request):
-    """返回聊天页面"""
-    return render(request, "ai_api/stream_chat.html")
+from ai_api.models import ChatMessage
+from django.contrib.auth.models import User
 
 @csrf_exempt
 def stream_chat(request):
@@ -71,6 +58,23 @@ def stream_chat(request):
                         parsed = json.loads(raw_data)
                         delta = parsed['choices'][0]['delta'].get('content', '')
                         if delta:
+                            # 保存聊天记录到数据库
+                            user = User.objects.get(username=request.user.username)  # 根据当前登录用户获取用户对象
+                            ChatMessage.objects.create(
+                                user=user,
+                                model_type=model,
+                                role='user',
+                                content=question,
+                                is_stream=True
+                            )
+                            ChatMessage.objects.create(
+                                user=user,
+                                model_type=model,
+                                role='ai',
+                                content=delta,
+                                is_stream=True
+                            )
+
                             yield f"data: {json.dumps({'content': delta})}\n\n"
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
