@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>DeepSeek 智能助手</title>
+  <title>HuengZing的助手</title>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <style>
@@ -65,11 +65,23 @@
       border-radius: 6px;
       margin-bottom: 1rem;
     }
+    /* 错误信息提示 */
+    #error-message {
+      color: red;
+      display: none;
+      padding: 10px;
+      border: 1px solid red;
+      background-color: #ffcccb;
+      margin-bottom: 15px;
+    }
   </style>
 </head>
 <body>
 <div id="chat-container">
-  <h1>DeepSeek 智能助手</h1>
+  <h1>HuengZing的助手</h1>
+
+  <!-- 错误信息提示 -->
+  <div id="error-message"></div>
 
   <!-- 清空聊天记录按钮 -->
   <div style="text-align: right;">
