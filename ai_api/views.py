@@ -1,6 +1,23 @@
+import json
+import logging
+import requests
+from django.conf import settings
+from django.shortcuts import render
+from django.http import JsonResponse, StreamingHttpResponse
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
 from ai_api.models import ChatMessage
 from django.contrib.auth.models import User
 
+logger = logging.getLogger(__name__)
+
+# 聊天页面视图（需要登录）
+@login_required
+def stream_chat_page(request):
+    """返回聊天页面"""
+    return render(request, "ai_api/stream_chat.html")
+
+# 流式聊天的处理
 @csrf_exempt
 def stream_chat(request):
     """处理流式聊天请求"""
@@ -8,6 +25,7 @@ def stream_chat(request):
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
     try:
+        # 从请求中获取问题和所选模型
         body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
@@ -42,9 +60,11 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
+        # 存储聊天记录的流式处理
         def event_stream():
             """流式读取 DeepSeek API 返回内容，并转发给前端"""
             try:
+                # 获取 DeepSeek API 响应数据流
                 for line in response.iter_lines(decode_unicode=True):
                     if not line:
                         continue
@@ -59,7 +79,8 @@ def stream_chat(request):
                         delta = parsed['choices'][0]['delta'].get('content', '')
                         if delta:
                             # 保存聊天记录到数据库
-                            user = User.objects.get(username=request.user.username)  # 根据当前登录用户获取用户对象
+                            user = User.objects.get(username=request.user.username)  # 获取当前登录的用户对象
+                            # 保存用户消息
                             ChatMessage.objects.create(
                                 user=user,
                                 model_type=model,
@@ -67,6 +88,7 @@ def stream_chat(request):
                                 content=question,
                                 is_stream=True
                             )
+                            # 保存AI回应
                             ChatMessage.objects.create(
                                 user=user,
                                 model_type=model,
