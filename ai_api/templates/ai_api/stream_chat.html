@@ -7,48 +7,23 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
   <style>
     body {
+      background-color: #222;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #fff;
       max-width: 800px;
       margin: 0 auto;
       padding: 2rem;
-      background: #f8fafc;
-    }
-    #login-container, #chat-container {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      padding: 1.5rem;
     }
     #chat-box {
       height: 60vh;
       overflow-y: auto;
       padding: 1rem;
-      background: #f8fafc;
+      background: #333;
       border-radius: 8px;
       margin-bottom: 1rem;
     }
-    .message {
-      margin: 1rem 0;
-      padding: 1rem;
-      border-radius: 8px;
-      background: white;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .user-message { border-left: 4px solid #4299e1; }
-    .ai-message { border-left: 4px solid #48bb78; }
-    .message-header { display: flex; align-items: center; margin-bottom: 0.5rem; color: #4a5568; }
-    .message-header strong { margin-right: 0.5rem; }
-    .timestamp { font-size: 0.8rem; color: #718096; }
-    textarea, input {
-      width: 100%;
-      padding: 0.8rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-    }
-    textarea { resize: vertical; min-height: 80px; }
     button {
-      background: #2b6cb0;
+      background: #28a745;
       color: white;
       border: none;
       padding: 0.6rem 1.2rem;
@@ -56,234 +31,107 @@
       cursor: pointer;
       transition: background 0.2s;
     }
-    button:hover { background: #2c5282; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
-    .markdown-body { line-height: 1.6; }
-    .model-selector {
-      padding: 0.5rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 6px;
-      margin-bottom: 1rem;
+    button:hover {
+      background: #218838;
     }
-    #error-message {
-      color: red;
-      display: none;
-      padding: 10px;
-      border: 1px solid red;
-      background-color: #ffcccb;
-      margin-bottom: 15px;
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    textarea, input {
+      width: 100%;
+      padding: 0.8rem;
+      border: 2px solid #444;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      background-color: #444;
+      color: #fff;
     }
   </style>
 </head>
 <body>
-  <div id="login-container">
-    <h1>登录</h1>
-    <div id="error-message"></div>
-    <input type="text" id="username" placeholder="用户名">
-    <input type="password" id="password" placeholder="密码">
-    <button onclick="loginUser()">登录</button>
-  </div>
-
-  <div id="chat-container" style="display: none;">
-    <h1>HuengZing的助手-20250506A</h1>
-    <div id="error-message-chat"></div>
-    <div style="text-align: right;">
-      <button onclick="clearChat()">清空聊天记录</button>
-    </div>
-    <select class="model-selector" id="model-select">
-      <option value="v3">通用聊天模型 (v3)</option>
-      <option value="r1">代码助手 (r1)</option>
-    </select>
+  <div id="chat-container">
+    <h1>HuengZing的助手</h1>
     <div id="chat-box"></div>
-    <textarea id="user-input" placeholder="输入您的问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
-    <div style="text-align: right; margin-top: 1rem;">
-      <button id="send-btn" onclick="sendMessage()">发送</button>
-    </div>
+    <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
+    <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
 
-<script>
-let controller = null;
-const chatBox = document.getElementById('chat-box');
-const sendBtn = document.getElementById('send-btn');
+  <script>
+    let controller = null;
 
-function getCookie(name) {
-  let cookieValue = null;
-  if (document.cookie && document.cookie !== '') {
-    const cookies = document.cookie.split(';');
-    for (let i = 0; i < cookies.length; i++) {
-      const cookie = cookies[i].trim();
-      if (cookie.substring(0, name.length + 1) === (name + '=')) {
-        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-        break;
-      }
-    }
-  }
-  return cookieValue;
-}
+    async function sendMessage() {
+      const input = document.getElementById('user-input');
+      const question = input.value.trim();
+      const sendBtn = document.getElementById('send-btn');
+      const chatBox = document.getElementById('chat-box');
 
-async function loginUser() {
-  const username = document.getElementById('username').value;
-  const password = document.getElementById('password').value;
-  const errorMessage = document.getElementById('error-message');
-  const csrftoken = getCookie('csrftoken');
+      if (!question) return;
 
-  try {
-    const response = await fetch('/login/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrftoken
-      },
-      body: JSON.stringify({ username, password })
-    });
+      sendBtn.disabled = true;
+      input.value = '';
 
-    const result = await response.json();
+      // 用户消息
+      const userMsg = document.createElement('div');
+      userMsg.classList.add('message', 'user-message');
+      userMsg.innerHTML = `<strong>您:</strong><p>${question}</p>`;
+      chatBox.appendChild(userMsg);
 
-    if (result.success) {
-      // 成功登录，显示聊天界面
-      document.getElementById('login-container').style.display = 'none';
-      document.getElementById('chat-container').style.display = 'block';
-    } else {
-      // 显示错误信息
-      errorMessage.innerHTML = result.error || '未知错误';
-      errorMessage.style.display = 'block';
-    }
-  } catch (err) {
-    errorMessage.innerHTML = '登录失败，请重试';
-    errorMessage.style.display = 'block';
-  }
-}
+      // AI 消息框
+      const aiMsg = document.createElement('div');
+      aiMsg.classList.add('message', 'ai-message');
+      aiMsg.innerHTML = '<strong>AI助手:</strong><p>思考中...</p>';
+      chatBox.appendChild(aiMsg);
 
-function handleKeydown(event) {
-  if (event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault();
-    sendMessage();
-  }
-}
+      // 滚动到底部
+      chatBox.scrollTop = chatBox.scrollHeight;
 
-async function sendMessage() {
-  const input = document.getElementById('user-input');
-  const question = input.value.trim();
-  const model = document.getElementById('model-select').value;
+      const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-  if (!question) {
-    input.classList.add('error');
-    return;
-  }
+      try {
+        const response = await fetch('/chat/stream/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrftoken
+          },
+          body: JSON.stringify({ question, model: 'v3' })
+        });
 
-  sendBtn.disabled = true;
-  input.value = '';
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-  const userMsg = createMessageElement('user', question);
-  chatBox.appendChild(userMsg);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-  const aiMsg = createMessageElement('ai', '思考中...');
-  chatBox.appendChild(aiMsg);
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n\n');
 
-  scrollToBottom();
-
-  const csrftoken = getCookie('csrftoken');
-
-  controller = new AbortController();
-  try {
-    const response = await fetch('/chat/stream/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrftoken
-      },
-      credentials: 'same-origin',
-      body: JSON.stringify({ question, model }),
-      signal: controller.signal
-    });
-
-    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-
-    let buffer = ''; // 用于累积流式数据
-    let currentContent = ''; // 用于存储当前完整内容
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += value;
-      const lines = buffer.split('\n\n'); // 根据流数据分割
-
-      for (let i = 0; i < lines.length - 1; i++) {
-        const line = lines[i].trim();
-        if (!line.startsWith('data: ')) continue;
-
-        const rawData = line.replace('data: ', '').trim();
-        if (rawData === '[DONE]') break;
-
-        try {
-          const data = JSON.parse(rawData);
-          if (data.error) {
-            updateMessage(aiMsg, data.error, true);
-            break;
+          for (let line of lines.slice(0, -1)) {
+            const data = JSON.parse(line.replace('data: ', ''));
+            if (data.content) {
+              aiMsg.querySelector('p').textContent = data.content;
+              chatBox.scrollTop = chatBox.scrollHeight;
+            }
           }
-          // 逐步更新内容
-          currentContent += data.content;
-          updateMessage(aiMsg, currentContent);
-          await new Promise(resolve => setTimeout(resolve, 30)); // 延时模拟打字效果
-        } catch (e) {
-          console.error('Failed to parse JSON:', rawData, e);
-          updateMessage(aiMsg, '⚠️ 解析失败', true);
-          break;
+          buffer = lines[lines.length - 1];
         }
+      } catch (error) {
+        console.error(error);
+        aiMsg.querySelector('p').textContent = '请求失败，请重试';
+      } finally {
+        sendBtn.disabled = false;
       }
-
-      buffer = lines[lines.length - 1];
     }
-  } catch (err) {
-    console.error(err);
-    updateMessage(aiMsg, `请求失败，请重试。`, true);
-  } finally {
-    sendBtn.disabled = false;
-    controller = null;
-  }
-}
 
-function createMessageElement(role, text) {
-  const div = document.createElement('div');
-  div.className = `message ${role}-message`;
-
-  const header = document.createElement('div');
-  header.className = 'message-header';
-  header.innerHTML = `<strong>${role === 'user' ? '您' : 'AI助手'}</strong><span class="timestamp">${new Date().toLocaleTimeString()}</span>`;
-
-  const content = document.createElement('div');
-  content.className = 'markdown-body';
-  content.innerHTML = renderMarkdown(text);
-
-  div.appendChild(header);
-  div.appendChild(content);
-  return div;
-}
-
-function updateMessage(element, content, isError = false) {
-  const contentDiv = element.querySelector('.markdown-body');
-  contentDiv.innerHTML = isError
-    ? `<span style="color: #e53e3e;">${content}</span>`
-    : renderMarkdown(content);
-  scrollToBottom();
-}
-
-function renderMarkdown(text) {
-  const rawHtml = marked.parse(text);
-  return DOMPurify.sanitize(rawHtml);
-}
-
-function scrollToBottom() {
-  requestAnimationFrame(() => {
-    chatBox.scrollTop = chatBox.scrollHeight;
-  });
-}
-
-function clearChat() {
-  document.getElementById('chat-box').innerHTML = '';
-  document.getElementById('user-input').value = '';
-}
-</script>
+    function handleKeydown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+  </script>
 </body>
 </html>
