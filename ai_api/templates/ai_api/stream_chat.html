@@ -1,3 +1,5 @@
+<!-- ai_api/templates/ai_api/stream_chat.html -->
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -71,6 +73,14 @@
       background-color: #ffcccb;
       margin-bottom: 15px;
     }
+    .chat-history {
+      background-color: #222;
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -85,6 +95,17 @@
       <option value="r1">代码助手 (r1)</option>
     </select>
     <div id="chat-box"></div>
+
+    <!-- 显示历史聊天记录 -->
+    <div class="chat-history">
+      <h3>聊天记录</h3>
+      <ul id="chat-history-list">
+        {% for message in chat_history %}
+          <li><strong>{{ message.user.username }}:</strong> {{ message.content }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
     <form>
       {% csrf_token %}
       <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
