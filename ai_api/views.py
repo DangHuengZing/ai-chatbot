@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from ai_api.models import ChatMessage
 from django.contrib.auth.models import User
+from django.contrib.auth import authenticate, login
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,6 @@ def stream_chat_page(request):
     return render(request, "ai_api/stream_chat.html", {
         'username': request.user.username
     })
-
-from django.contrib.auth.decorators import login_required
 
 # 流式聊天的处理
 @login_required
@@ -121,11 +120,7 @@ def stream_chat(request):
             content_type="text/event-stream"
         )
 
-from django.contrib.auth import authenticate, login
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-import json
-
+# 用户登录视图
 @csrf_exempt
 def login_user(request):
     """处理用户登录"""
