@@ -7,7 +7,7 @@ from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import authenticate, login, logout
-from .models import ChatMessage  # 导入 ChatMessage 模型
+from .models import ChatMessage
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +44,11 @@ def login_user(request):
 
 def logout_user(request):
     """用户登出"""
-    logout(request)
-    return redirect('login')
+    if request.method == 'GET':
+        logout(request)
+        logger.info("User logged out")
+        return JsonResponse({'success': True}, status=200)
+    return JsonResponse({'error': 'Invalid method'}, status=405)
 
 @login_required
 def stream_chat_page(request):
@@ -76,6 +79,15 @@ def stream_chat(request):
                 iter([f"data: {json.dumps({'error': '问题不能为空'})}\n\n"]),
                 content_type="text/event-stream"
             )
+
+        # Save user question to database
+        ChatMessage.objects.create(
+            user=request.user,
+            model_type=model,
+            role='user',
+            content=question,
+            is_stream=True
+        )
 
         if not hasattr(settings, 'DEEPSEEK_API_KEY'):
             logger.error("DeepSeek API key not configured")
@@ -128,8 +140,14 @@ def stream_chat(request):
                         delta = parsed['choices'][0]['delta'].get('content', '')
                         if delta:
                             yield f"data: {json.dumps({'content': delta})}\n\n"
-                            # 保存聊天记录到数据库
-                            ChatMessage.objects.create(user=request.user, model_type=model, role='user', content=delta, is_stream=True)
+                            # Save AI response to database
+                            ChatMessage.objects.create(
+                                user=request.user,
+                                model_type=model,
+                                role='ai',
+                                content=delta,
+                                is_stream=True
+                            )
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
