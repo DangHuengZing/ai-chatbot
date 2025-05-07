@@ -124,14 +124,44 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
+        # Fetch message history
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
-        messages = [
-            {'role': 'assistant' if msg['role'] == 'ai' else msg['role'], 'content': msg['content']}
-            for msg in history
-        ]
-        messages.append({'role': 'user', 'content': question})
+
+        # Merge consecutive messages of the same role
+        merged_messages = []
+        last_role = None
+        last_content = ""
+
+        for msg in history:
+            role = 'assistant' if msg['role'] == 'ai' else msg['role']
+            content = msg['content']
+
+            if role == last_role:
+                # Merge with the previous message
+                last_content += "\n" + content
+            else:
+                # Add the previous message (if any) to the list
+                if last_role is not None:
+                    merged_messages.append({'role': last_role, 'content': last_content})
+                last_role = role
+                last_content = content
+
+        # Append the last message
+        if last_role is not None:
+            merged_messages.append({'role': last_role, 'content': last_content})
+
+        # Ensure the last message is a user message before appending the current question
+        if merged_messages and merged_messages[-1]['role'] == 'user':
+            # Merge the current question with the last user message
+            merged_messages[-1]['content'] += "\n" + question
+        else:
+            # Append the current question as a new user message
+            merged_messages.append({'role': 'user', 'content': question})
+
+        messages = merged_messages
+        logger.info(f"Merged messages for DeepSeek API: {messages}")
 
         api_model = "deepseek-chat" if model == "v3" else "deepseek-reasoner"
         logger.info(f"Using API model: {api_model}")
