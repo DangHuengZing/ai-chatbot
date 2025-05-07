@@ -124,12 +124,10 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
-        # Fetch message history
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
 
-        # Merge consecutive messages of the same role
         merged_messages = []
         last_role = None
         last_content = ""
@@ -220,7 +218,7 @@ def stream_chat(request):
                             chunk_received = True
                             full_content += delta
                             logger.info(f"Streaming chunk: {delta}")
-                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id})}\n\n"
+                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id, 'model': api_model})}\n\n"
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
