@@ -1,8 +1,9 @@
 import json
 import logging
 import requests
+import uuid
 from django.conf import settings
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
@@ -51,13 +52,31 @@ def logout_user(request):
     return JsonResponse({'error': 'Invalid method'}, status=405)
 
 @login_required
-def stream_chat_page(request):
+def stream_chat_page(request, conversation_id=None):
     """返回聊天页面，并显示历史记录"""
     logger.info(f"Rendering stream_chat.html for user {request.user.username}")
-    chat_history = ChatMessage.objects.filter(user=request.user).order_by('-timestamp')[:10]
+    if conversation_id:
+        chat_history = ChatMessage.objects.filter(user=request.user, conversation_id=conversation_id).order_by('timestamp')
+    else:
+        chat_history = ChatMessage.objects.filter(user=request.user).order_by('timestamp')[:50]
+
+    # 获取侧边栏的对话列表
+    conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
+    conversation_list = []
+    for conv in conversations:
+        first_message = ChatMessage.objects.filter(
+            user=request.user, conversation_id=conv['conversation_id']
+        ).order_by('timestamp').first()
+        conversation_list.append({
+            'id': str(conv['conversation_id']),
+            'title': first_message.content[:30] if first_message else '未命名对话'
+        })
+
     return render(request, 'ai_api/stream_chat.html', {
         'username': request.user.username,
-        'chat_history': chat_history
+        'chat_history': chat_history,
+        'conversations': conversation_list,
+        'current_conversation_id': str(conversation_id) if conversation_id else ''
     })
 
 @login_required
@@ -72,6 +91,7 @@ def stream_chat(request):
         body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
+        conversation_id = body.get('conversation_id', str(uuid.uuid4()))
 
         if not question:
             logger.warning("Empty question received")
@@ -80,9 +100,10 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
-        # Save user question to database
+        # 保存用户问题
         ChatMessage.objects.create(
             user=request.user,
+            conversation_id=conversation_id,
             model_type=model,
             role='user',
             content=question,
@@ -96,6 +117,15 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
+        # 构建对话上下文
+        history = ChatMessage.objects.filter(
+            user=request.user, conversation_id=conversation_id
+        ).order_by('timestamp').values('role', 'content')[:10]
+        messages = [
+            {'role': msg['role'], 'content': msg['content']} for msg in history
+        ]
+        messages.append({'role': 'user', 'content': question})
+
         api_model = "deepseek-chat" if model == "v3" else "deepseek-reasoner"
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
@@ -103,7 +133,7 @@ def stream_chat(request):
         }
         payload = {
             'model': api_model,
-            'messages': [{'role': 'user', 'content': question}],
+            'messages': messages,
             'stream': True
         }
 
@@ -124,6 +154,7 @@ def stream_chat(request):
             )
 
         def event_stream():
+            full_content = ''
             try:
                 for line in response.iter_lines(decode_unicode=True):
                     if not line:
@@ -133,21 +164,23 @@ def stream_chat(request):
                         continue
                     raw_data = line.removeprefix("data: ").strip()
                     if raw_data == '[DONE]':
+                        if full_content:
+                            ChatMessage.objects.create(
+                                user=request.user,
+                                conversation_id=conversation_id,
+                                model_type=model,
+                                role='ai',
+                                content=full_content,
+                                is_stream=True
+                            )
                         yield 'data: [DONE]\n\n'
                         break
                     try:
                         parsed = json.loads(raw_data)
                         delta = parsed['choices'][0]['delta'].get('content', '')
                         if delta:
-                            yield f"data: {json.dumps({'content': delta})}\n\n"
-                            # Save AI response to database
-                            ChatMessage.objects.create(
-                                user=request.user,
-                                model_type=model,
-                                role='ai',
-                                content=delta,
-                                is_stream=True
-                            )
+                            full_content += delta
+                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id})}\n\n"
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
@@ -172,3 +205,18 @@ def stream_chat(request):
             iter([f"data: {json.dumps({'error': str(e)})}\n\n"]),
             content_type="text/event-stream"
         )
+
+@login_required
+def get_conversations(request):
+    """返回用户的对话列表"""
+    conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
+    conversation_list = []
+    for conv in conversations:
+        first_message = ChatMessage.objects.filter(
+            user=request.user, conversation_id=conv['conversation_id']
+        ).order_by('timestamp').first()
+        conversation_list.append({
+            'id': str(conv['conversation_id']),
+            'title': first_message.content[:30] if first_message else '未命名对话'
+        })
+    return JsonResponse({'conversations': conversation_list})
