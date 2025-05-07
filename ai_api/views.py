@@ -55,12 +55,14 @@ def logout_user(request):
 def stream_chat_page(request, conversation_id=None):
     """返回聊天页面，并显示历史记录"""
     logger.info(f"Rendering stream_chat.html for user {request.user.username}")
+
+    # 获取聊天记录，如果有 conversation_id，就按会话 ID 获取历史记录
     if conversation_id:
         chat_history = ChatMessage.objects.filter(user=request.user, conversation_id=conversation_id).order_by('timestamp')
     else:
         chat_history = ChatMessage.objects.filter(user=request.user).order_by('timestamp')[:50]
 
-    # 获取侧边栏的对话列表
+    # 获取会话列表
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
@@ -69,7 +71,7 @@ def stream_chat_page(request, conversation_id=None):
         ).order_by('timestamp').first()
         conversation_list.append({
             'id': str(conv['conversation_id']),
-            'title': first_message.content[:30] if first_message else '未命名对话'
+            'title': first_message.title if first_message else '未命名对话'
         })
 
     return render(request, 'ai_api/stream_chat.html', {
