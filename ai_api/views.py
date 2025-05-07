@@ -56,13 +56,11 @@ def stream_chat_page(request, conversation_id=None):
     """返回聊天页面，并显示历史记录"""
     logger.info(f"Rendering stream_chat.html for user {request.user.username}")
 
-    # 获取聊天记录，如果有 conversation_id，就按会话 ID 获取历史记录
     if conversation_id:
         chat_history = ChatMessage.objects.filter(user=request.user, conversation_id=conversation_id).order_by('timestamp')
     else:
         chat_history = ChatMessage.objects.filter(user=request.user).order_by('timestamp')[:50]
 
-    # 获取会话列表
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
@@ -102,7 +100,6 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
-        # 保存用户问题
         ChatMessage.objects.create(
             user=request.user,
             conversation_id=conversation_id,
@@ -119,16 +116,14 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
-        # 构建对话上下文
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
-        messages = [
-            {'role': msg['role'], 'content': msg['content']} for msg in history
-        ]
+        messages = [{'role': msg['role'], 'content': msg['content']} for msg in history]
         messages.append({'role': 'user', 'content': question})
 
-        api_model = "deepseek-chat" if model == "v3" else "deepseek-reasoner"
+        # Align with MODEL_CHOICES labels
+        api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"  # Fixed mapping
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json'
@@ -219,6 +214,21 @@ def get_conversations(request):
         ).order_by('timestamp').first()
         conversation_list.append({
             'id': str(conv['conversation_id']),
-            'title': first_message.content[:30] if first_message else '未命名对话'
+            'title': first_message.title if first_message else '未命名对话'
         })
     return JsonResponse({'conversations': conversation_list})
+
+@login_required
+@csrf_exempt
+def delete_conversation(request, conversation_id):
+    """删除指定会话的所有消息"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    try:
+        ChatMessage.objects.filter(user=request.user, conversation_id=conversation_id).delete()
+        logger.info(f"Conversation {conversation_id} deleted for user {request.user.username}")
+        return JsonResponse({'success': True})
+    except Exception as e:
+        logger.error(f"Error deleting conversation {conversation_id}: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
