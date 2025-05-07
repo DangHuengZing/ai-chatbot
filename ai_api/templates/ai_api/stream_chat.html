@@ -325,9 +325,13 @@
 
             const aiMsg = document.createElement('div');
             aiMsg.className = 'message ai-message';
+            const contentP = document.createElement('p');
+            contentP.innerHTML = '思考中...';
             aiMsg.innerHTML = `
                 <strong>AI助手:</strong>
-                <p>思考中...</p>
+            `;
+            aiMsg.appendChild(contentP);
+            aiMsg.innerHTML += `
                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
             `;
             chatBox.appendChild(aiMsg);
@@ -345,6 +349,7 @@
             }
 
             let hasError = false;
+            let currentContent = '';
 
             try {
                 const response = await fetch('/chat/stream/', {
@@ -363,17 +368,12 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let currentContent = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
                         if (currentContent && !hasError) {
-                            aiMsg.innerHTML = `
-                                <strong>AI助手:</strong>
-                                <p>${renderMarkdown(currentContent)}</p>
-                                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-                            `;
+                            contentP.innerHTML = renderMarkdown(currentContent);
                             chatBox.scrollTop = chatBox.scrollHeight;
                             updateSidebar();
                         }
@@ -391,29 +391,24 @@
                         try {
                             const data = JSON.parse(rawData);
                             if (data.error) {
-                                aiMsg.querySelector('p').textContent = data.error;
+                                contentP.textContent = data.error;
                                 errorMessage.textContent = data.error;
                                 errorMessage.style.display = 'block';
                                 hasError = true;
                                 break;
                             }
                             const delta = data.content || '';
-                            console.log('Received chunk:', delta); // Debug streaming
+                            console.log('Received chunk:', delta);
                             currentContent += delta;
-                            aiMsg.innerHTML = `
-                                <strong>AI助手:</strong>
-                                <p>${renderMarkdown(currentContent)}</p>
-                                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-                            `;
+                            contentP.innerHTML = renderMarkdown(currentContent);
                             chatBox.scrollTop = chatBox.scrollHeight;
-                            // Add slight delay to ensure smooth rendering (optional)
-                            await new Promise(resolve => setTimeout(resolve, 10));
+                            await new Promise(resolve => setTimeout(resolve, 20)); // Adjust delay for smoother streaming
                             if (data.conversation_id && !currentConversationId) {
                                 currentConversationId = data.conversation_id;
                             }
                         } catch (e) {
                             console.error('解析错误:', rawData, e);
-                            aiMsg.querySelector('p').textContent = '解析失败';
+                            contentP.textContent = '解析失败';
                             errorMessage.textContent = '解析失败';
                             errorMessage.style.display = 'block';
                             hasError = true;
@@ -424,7 +419,7 @@
                 }
             } catch (error) {
                 console.error('请求错误:', error);
-                aiMsg.querySelector('p').textContent = '请求失败，请重试';
+                contentP.textContent = '请求失败，请重试';
                 errorMessage.textContent = '请求失败，请重试';
                 errorMessage.style.display = 'block';
                 hasError = true;
