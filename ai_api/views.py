@@ -91,7 +91,11 @@ def stream_chat(request):
         body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
-        conversation_id = body.get('conversation_id', str(uuid.uuid4()))
+        conversation_id = body.get('conversation_id', None)  # Get conversation_id, default to None
+
+        # If conversation_id is empty or not provided, generate a new UUID
+        if not conversation_id or conversation_id.strip() == '':
+            conversation_id = str(uuid.uuid4())
 
         if not question:
             logger.warning("Empty question received")
@@ -122,8 +126,7 @@ def stream_chat(request):
         messages = [{'role': msg['role'], 'content': msg['content']} for msg in history]
         messages.append({'role': 'user', 'content': question})
 
-        # Align with MODEL_CHOICES labels
-        api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"  # Fixed mapping
+        api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json'
