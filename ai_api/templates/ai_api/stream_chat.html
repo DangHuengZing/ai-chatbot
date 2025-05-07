@@ -319,141 +319,142 @@
         }
 
         async function sendMessage() {
-            const input = document.getElementById('user-input');
-            const question = input.value.trim();
-            const model = document.getElementById('model-select').value;
-            console.log('Selected model:', model);
-            if (!question) return;
+    const input = document.getElementById('user-input');
+    const question = input.value.trim();
+    const model = document.getElementById('model-select').value;
+    console.log('Selected model:', model);
+    if (!question) return;
 
-            sendBtn.disabled = true;
-            sendBtn.textContent = '发送中...';
-            input.value = '';
-            errorMessage.style.display = 'none';
+    sendBtn.disabled = true;
+    sendBtn.textContent = '发送中...';
+    input.value = '';
+    errorMessage.style.display = 'none';
 
-            const userMsg = document.createElement('div');
-            userMsg.className = 'message user-message';
-            userMsg.innerHTML = `
-                <strong>您:</strong>
-                <p>${DOMPurify.sanitize(question)}</p>
-                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-            `;
-            chatBox.appendChild(userMsg);
-            autoScroll();
+    const userMsg = document.createElement('div');
+    userMsg.className = 'message user-message';
+    userMsg.innerHTML = `
+        <strong>您:</strong>
+        <p>${DOMPurify.sanitize(question)}</p>
+        <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+    `;
+    chatBox.appendChild(userMsg);
+    autoScroll();
 
-            const aiMsg = document.createElement('div');
-            aiMsg.className = 'message ai-message';
-            const contentP = document.createElement('p');
-            contentP.innerHTML = '思考中...';
-            aiMsg.innerHTML = `
-                <strong>AI助手:</strong>
-            `;
-            aiMsg.appendChild(contentP);
-            aiMsg.innerHTML += `
-                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-            `;
-            chatBox.appendChild(aiMsg);
-            autoScroll();
+    const aiMsg = document.createElement('div');
+    aiMsg.className = 'message ai-message';
+    const contentP = document.createElement('p');
+    contentP.innerHTML = '思考中...';
+    aiMsg.innerHTML = `
+        <strong>AI助手:</strong>
+    `;
+    aiMsg.appendChild(contentP);
+    aiMsg.innerHTML += `
+        <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+    `;
+    chatBox.appendChild(aiMsg);
+    autoScroll();
 
-            const csrftoken = getCookie('csrftoken');
-            if (!csrftoken) {
-                console.error('CSRF token not found');
-                errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
-                errorMessage.style.display = 'block';
-                sendBtn.disabled = false;
-                sendBtn.textContent = '发送';
-                return;
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        console.error('CSRF token not found');
+        errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
+        errorMessage.style.display = 'block';
+        sendBtn.disabled = false;
+        sendBtn.textContent = '发送';
+        return;
+    }
+
+    let hasError = false;
+    let currentContent = '';
+
+    try {
+        const response = await fetch('/chat/stream/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ question, model, conversation_id: currentConversationId })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Fetch error:', errorText);
+            throw new Error(`HTTP error ${response.status}: ${errorText}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                console.log('Stream ended');
+                if (currentContent && !hasError) {
+                    contentP.innerHTML = renderMarkdown(currentContent);
+                    autoScroll();
+                    updateSidebar();
+                } else if (!hasError) {
+                    contentP.textContent = '未收到回应';
+                    errorMessage.textContent = '未收到AI回应，请重试';
+                    errorMessage.style.display = 'block';
+                    hasError = true;
+                }
+                break;
             }
 
-            let hasError = false;
-            let currentContent = '';
+            buffer += decoder.decode(value, { stream: true });
+            console.log('Buffer received:', buffer);
+            const lines = buffer.split('\n\n');
 
-            try {
-                const response = await fetch('/chat/stream/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrftoken
-                    },
-                    body: JSON.stringify({ question, model, conversation_id: currentConversationId })
-                });
+            for (let line of lines.slice(0, -1)) {
+                if (!line.startsWith('data: ')) continue;
+                const rawData = line.replace('data: ', '').trim();
+                if (rawData === '[DONE]') break;
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Fetch error:', errorText);
-                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) {
-                        console.log('Stream ended');
-                        if (currentContent && !hasError) {
-                            contentP.innerHTML = renderMarkdown(currentContent);
-                            autoScroll();
-                            updateSidebar();
-                        } else if (!hasError) {
-                            contentP.textContent = '未收到回应';
-                            errorMessage.textContent = '未收到AI回应，请重试';
-                            errorMessage.style.display = 'block';
-                            hasError = true;
-                        }
+                try {
+                    const data = JSON.parse(rawData);
+                    console.log('Parsed data:', data);
+                    if (data.error) {
+                        contentP.textContent = data.error;
+                        errorMessage.textContent = data.error;
+                        errorMessage.style.display = 'block';
+                        hasError = true;
                         break;
                     }
-
-                    buffer += decoder.decode(value, { stream: true });
-                    console.log('Buffer received:', buffer);
-                    const lines = buffer.split('\n\n');
-
-                    for (let line of lines.slice(0, -1)) {
-                        if (!line.startsWith('data: ')) continue;
-                        const rawData = line.replace('data: ', '').trim();
-                        if (rawData === '[DONE]') break;
-
-                        try {
-                            const data = JSON.parse(rawData);
-                            console.log('Parsed data:', data);
-                            if (data.error) {
-                                contentP.textContent = data.error;
-                                errorMessage.textContent = data.error;
-                                errorMessage.style.display = 'block';
-                                hasError = true;
-                                break;
-                            }
-                            const delta = data.content || '';
-                            console.log('Received chunk:', delta);
-                            currentContent += delta;
-                            contentP.innerHTML = renderMarkdown(currentContent);
-                            autoScroll();
-                            await new Promise(resolve => setTimeout(resolve, 20));
-                            if (data.conversation_id && !currentConversationId) {
-                                currentConversationId = data.conversation_id;
-                            }
-                        } catch (e) {
-                            console.error('解析错误:', rawData, e);
-                            contentP.textContent = '解析失败';
-                            errorMessage.textContent = '解析失败：' + e.message;
-                            errorMessage.style.display = 'block';
-                            hasError = true;
-                            break;
-                        }
+                    const delta = data.content || '';
+                    console.log('Received chunk:', delta);
+                    console.log('Model used in response:', data.model);
+                    currentContent += delta;
+                    contentP.innerHTML = renderMarkdown(currentContent);
+                    autoScroll();
+                    await new Promise(resolve => setTimeout(resolve, 20));
+                    if (data.conversation_id && !currentConversationId) {
+                        currentConversationId = data.conversation_id;
                     }
-                    buffer = lines[lines.length - 1];
+                } catch (e) {
+                    console.error('解析错误:', rawData, e);
+                    contentP.textContent = '解析失败';
+                    errorMessage.textContent = '解析失败：' + e.message;
+                    errorMessage.style.display = 'block';
+                    hasError = true;
+                    break;
                 }
-            } catch (error) {
-                console.error('请求错误:', error);
-                contentP.textContent = '请求失败，请重试';
-                errorMessage.textContent = '请求失败：' + error.message;
-                errorMessage.style.display = 'block';
-                hasError = true;
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = '发送';
             }
+            buffer = lines[lines.length - 1];
         }
+    } catch (error) {
+        console.error('请求错误:', error);
+        contentP.textContent = '请求失败，请重试';
+        errorMessage.textContent = '请求失败：' + error.message;
+        errorMessage.style.display = 'block';
+        hasError = true;
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = '发送';
+    }
+}
 
         function renderMarkdown(text) {
             try {
