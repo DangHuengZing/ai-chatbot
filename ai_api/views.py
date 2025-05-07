@@ -212,13 +212,18 @@ def get_conversations(request):
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
-        first_message = ChatMessage.objects.filter(
-            user=request.user, conversation_id=conv['conversation_id']
+        # Get the first user message for the title
+        first_user_message = ChatMessage.objects.filter(
+            user=request.user,
+            conversation_id=conv['conversation_id'],
+            role='user'
         ).order_by('timestamp').first()
-        conversation_list.append({
-            'id': str(conv['conversation_id']),
-            'title': first_message.title if first_message else '未命名对话'
-        })
+        if first_user_message:
+            conversation_list.append({
+                'id': str(conv['conversation_id']),
+                'title': first_user_message.title
+            })
+    logger.info(f"User {request.user.username} fetched {len(conversation_list)} conversations: {conversation_list}")
     return JsonResponse({'conversations': conversation_list})
 
 @login_required
