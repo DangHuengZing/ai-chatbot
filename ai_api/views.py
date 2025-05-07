@@ -64,13 +64,16 @@ def stream_chat_page(request, conversation_id=None):
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
-        first_message = ChatMessage.objects.filter(
-            user=request.user, conversation_id=conv['conversation_id']
+        first_user_message = ChatMessage.objects.filter(
+            user=request.user,
+            conversation_id=conv['conversation_id'],
+            role='user'
         ).order_by('timestamp').first()
-        conversation_list.append({
-            'id': str(conv['conversation_id']),
-            'title': first_message.title if first_message else '未命名对话'
-        })
+        if first_user_message:
+            conversation_list.append({
+                'id': str(conv['conversation_id']),
+                'title': first_user_message.title
+            })
 
     return render(request, 'ai_api/stream_chat.html', {
         'username': request.user.username,
@@ -91,9 +94,8 @@ def stream_chat(request):
         body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
-        conversation_id = body.get('conversation_id', None)  # Get conversation_id, default to None
+        conversation_id = body.get('conversation_id', None)
 
-        # If conversation_id is empty or not provided, generate a new UUID
         if not conversation_id or conversation_id.strip() == '':
             conversation_id = str(uuid.uuid4())
 
@@ -123,7 +125,11 @@ def stream_chat(request):
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
-        messages = [{'role': msg['role'], 'content': msg['content']} for msg in history]
+        # Map roles to DeepSeek-compatible values
+        messages = [
+            {'role': 'assistant' if msg['role'] == 'ai' else msg['role'], 'content': msg['content']}
+            for msg in history
+        ]
         messages.append({'role': 'user', 'content': question})
 
         api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
@@ -212,7 +218,6 @@ def get_conversations(request):
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
-        # Get the first user message for the title
         first_user_message = ChatMessage.objects.filter(
             user=request.user,
             conversation_id=conv['conversation_id'],
