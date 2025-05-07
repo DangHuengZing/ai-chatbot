@@ -139,25 +139,19 @@ def stream_chat(request):
             content = msg['content']
 
             if role == last_role:
-                # Merge with the previous message
                 last_content += "\n" + content
             else:
-                # Add the previous message (if any) to the list
                 if last_role is not None:
                     merged_messages.append({'role': last_role, 'content': last_content})
                 last_role = role
                 last_content = content
 
-        # Append the last message
         if last_role is not None:
             merged_messages.append({'role': last_role, 'content': last_content})
 
-        # Ensure the last message is a user message before appending the current question
         if merged_messages and merged_messages[-1]['role'] == 'user':
-            # Merge the current question with the last user message
             merged_messages[-1]['content'] += "\n" + question
         else:
-            # Append the current question as a new user message
             merged_messages.append({'role': 'user', 'content': question})
 
         messages = merged_messages
@@ -194,6 +188,7 @@ def stream_chat(request):
 
         def event_stream():
             full_content = ''
+            chunk_received = False
             try:
                 for line in response.iter_lines(decode_unicode=True):
                     if not line:
@@ -202,6 +197,7 @@ def stream_chat(request):
                     if not line.startswith("data: "):
                         continue
                     raw_data = line.removeprefix("data: ").strip()
+                    logger.info(f"Received raw data from DeepSeek: {raw_data}")
                     if raw_data == '[DONE]':
                         if full_content:
                             ChatMessage.objects.create(
@@ -212,13 +208,18 @@ def stream_chat(request):
                                 content=full_content,
                                 is_stream=True
                             )
+                        else:
+                            logger.warning("No content received from DeepSeek API")
+                            yield f"data: {json.dumps({'error': 'No response content received from DeepSeek API'})}\n\n"
                         yield 'data: [DONE]\n\n'
                         break
                     try:
                         parsed = json.loads(raw_data)
                         delta = parsed['choices'][0]['delta'].get('content', '')
                         if delta:
+                            chunk_received = True
                             full_content += delta
+                            logger.info(f"Streaming chunk: {delta}")
                             yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id})}\n\n"
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
@@ -228,6 +229,9 @@ def stream_chat(request):
                 logger.error(f"Stream error: {e}")
                 yield f"data: {json.dumps({'error': 'Stream error occurred'})}\n\n"
             finally:
+                if not chunk_received:
+                    logger.warning("No chunks received from DeepSeek API")
+                    yield f"data: {json.dumps({'error': 'No response chunks received from DeepSeek API'})}\n\n"
                 response.close()
 
         return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
