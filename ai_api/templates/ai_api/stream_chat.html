@@ -132,6 +132,7 @@
             background: #2a2a2a;
             border-radius: 8px;
             margin-bottom: 1rem;
+            box-sizing: border-box; /* Ensure padding doesn't affect height */
         }
         .message {
             margin: 1rem 0;
@@ -257,6 +258,22 @@
         const sendBtn = document.getElementById('send-btn');
         const errorMessage = document.getElementById('error-message');
         let currentConversationId = '{{ current_conversation_id|default:"" }}';
+        let isUserScrolling = false;
+
+        // Detect if the user is manually scrolling
+        chatBox.addEventListener('scroll', () => {
+            const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 1;
+            isUserScrolling = !isAtBottom;
+        });
+
+        function autoScroll() {
+            if (!isUserScrolling) {
+                requestAnimationFrame(() => {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                    console.log('Auto-scrolling to bottom');
+                });
+            }
+        }
 
         function getCookie(name) {
             let cookieValue = null;
@@ -322,6 +339,7 @@
                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
             `;
             chatBox.appendChild(userMsg);
+            autoScroll();
 
             const aiMsg = document.createElement('div');
             aiMsg.className = 'message ai-message';
@@ -335,8 +353,7 @@
                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
             `;
             chatBox.appendChild(aiMsg);
-
-            chatBox.scrollTop = chatBox.scrollHeight;
+            autoScroll();
 
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) {
@@ -374,7 +391,7 @@
                     if (done) {
                         if (currentContent && !hasError) {
                             contentP.innerHTML = renderMarkdown(currentContent);
-                            chatBox.scrollTop = chatBox.scrollHeight;
+                            autoScroll();
                             updateSidebar();
                         }
                         break;
@@ -401,8 +418,8 @@
                             console.log('Received chunk:', delta);
                             currentContent += delta;
                             contentP.innerHTML = renderMarkdown(currentContent);
-                            chatBox.scrollTop = chatBox.scrollHeight;
-                            await new Promise(resolve => setTimeout(resolve, 20)); // Adjust delay for smoother streaming
+                            autoScroll();
+                            await new Promise(resolve => setTimeout(resolve, 20));
                             if (data.conversation_id && !currentConversationId) {
                                 currentConversationId = data.conversation_id;
                             }
@@ -438,6 +455,7 @@
             chatBox.innerHTML = '';
             document.getElementById('user-input').value = '';
             errorMessage.style.display = 'none';
+            isUserScrolling = false;
         }
 
         function startNewConversation() {
@@ -446,6 +464,7 @@
             errorMessage.style.display = 'none';
             updateSidebar();
             document.getElementById('model-select').value = 'v3';
+            isUserScrolling = false;
         }
 
         function updateSidebar() {
