@@ -327,7 +327,7 @@
                                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
                             `;
                             chatBox.scrollTop = chatBox.scrollHeight;
-                            if (data.conversation_id && !currentConversationId) {
+                            if (data.conversation_id) {
                                 currentConversationId = data.conversation_id;
                                 updateSidebar();
                             }
@@ -364,7 +364,7 @@
         }
 
         function startNewConversation() {
-            currentConversationId = '';
+            currentConversationId = null;  // Let backend generate new ID
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
             updateSidebar();
