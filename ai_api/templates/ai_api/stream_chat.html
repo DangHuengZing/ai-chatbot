@@ -132,7 +132,7 @@
             background: #2a2a2a;
             border-radius: 8px;
             margin-bottom: 1rem;
-            box-sizing: border-box; /* Ensure padding doesn't affect height */
+            box-sizing: border-box;
         }
         .message {
             margin: 1rem 0;
@@ -260,7 +260,6 @@
         let currentConversationId = '{{ current_conversation_id|default:"" }}';
         let isUserScrolling = false;
 
-        // Detect if the user is manually scrolling
         chatBox.addEventListener('scroll', () => {
             const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 1;
             isUserScrolling = !isAtBottom;
@@ -379,7 +378,9 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+                    const errorText = await response.text();
+                    console.error('Fetch error:', errorText);
+                    throw new Error(`HTTP error ${response.status}: ${errorText}`);
                 }
 
                 const reader = response.body.getReader();
@@ -389,15 +390,22 @@
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
+                        console.log('Stream ended');
                         if (currentContent && !hasError) {
                             contentP.innerHTML = renderMarkdown(currentContent);
                             autoScroll();
                             updateSidebar();
+                        } else if (!hasError) {
+                            contentP.textContent = '未收到回应';
+                            errorMessage.textContent = '未收到AI回应，请重试';
+                            errorMessage.style.display = 'block';
+                            hasError = true;
                         }
                         break;
                     }
 
                     buffer += decoder.decode(value, { stream: true });
+                    console.log('Buffer received:', buffer);
                     const lines = buffer.split('\n\n');
 
                     for (let line of lines.slice(0, -1)) {
@@ -407,6 +415,7 @@
 
                         try {
                             const data = JSON.parse(rawData);
+                            console.log('Parsed data:', data);
                             if (data.error) {
                                 contentP.textContent = data.error;
                                 errorMessage.textContent = data.error;
@@ -426,7 +435,7 @@
                         } catch (e) {
                             console.error('解析错误:', rawData, e);
                             contentP.textContent = '解析失败';
-                            errorMessage.textContent = '解析失败';
+                            errorMessage.textContent = '解析失败：' + e.message;
                             errorMessage.style.display = 'block';
                             hasError = true;
                             break;
@@ -437,7 +446,7 @@
             } catch (error) {
                 console.error('请求错误:', error);
                 contentP.textContent = '请求失败，请重试';
-                errorMessage.textContent = '请求失败，请重试';
+                errorMessage.textContent = '请求失败：' + error.message;
                 errorMessage.style.display = 'block';
                 hasError = true;
             } finally {
@@ -447,8 +456,13 @@
         }
 
         function renderMarkdown(text) {
-            const rawHtml = marked.parse(text);
-            return DOMPurify.sanitize(rawHtml);
+            try {
+                const rawHtml = marked.parse(text);
+                return DOMPurify.sanitize(rawHtml);
+            } catch (e) {
+                console.error('Markdown渲染错误:', e);
+                return text; // Fallback to plain text
+            }
         }
 
         function clearChat() {
