@@ -306,6 +306,7 @@
             const input = document.getElementById('user-input');
             const question = input.value.trim();
             const model = document.getElementById('model-select').value;
+            console.log('Selected model:', model); // Debug log
             if (!question) return;
 
             sendBtn.disabled = true;
@@ -445,6 +446,8 @@
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
             updateSidebar();
+            // Reset model selector to default (optional, if desired)
+            document.getElementById('model-select').value = 'v3';
         }
 
         function updateSidebar() {
