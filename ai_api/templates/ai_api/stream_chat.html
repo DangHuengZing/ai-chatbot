@@ -126,7 +126,7 @@
         }
         #chat-box {
             flex: 1;
-            max-height: calc(100vh - 250px); /* Adjust based on header and input height */
+            max-height: calc(100vh - 250px);
             overflow-y: auto;
             padding: 1rem;
             background: #2a2a2a;
@@ -343,6 +343,8 @@
                 return;
             }
 
+            let hasError = false;
+
             try {
                 const response = await fetch('/chat/stream/', {
                     method: 'POST',
@@ -365,15 +367,15 @@
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) {
-                        if (currentContent) {
+                        if (currentContent && !hasError) {
                             aiMsg.innerHTML = `
                                 <strong>AI助手:</strong>
                                 <p>${renderMarkdown(currentContent)}</p>
                                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
                             `;
                             chatBox.scrollTop = chatBox.scrollHeight;
+                            updateSidebar();
                         }
-                        updateSidebar(); // Update sidebar only once after stream completes
                         break;
                     }
 
@@ -391,6 +393,7 @@
                                 aiMsg.querySelector('p').textContent = data.error;
                                 errorMessage.textContent = data.error;
                                 errorMessage.style.display = 'block';
+                                hasError = true;
                                 break;
                             }
                             currentContent += data.content || '';
@@ -408,6 +411,7 @@
                             aiMsg.querySelector('p').textContent = '解析失败';
                             errorMessage.textContent = '解析失败';
                             errorMessage.style.display = 'block';
+                            hasError = true;
                             break;
                         }
                     }
@@ -418,6 +422,7 @@
                 aiMsg.querySelector('p').textContent = '请求失败，请重试';
                 errorMessage.textContent = '请求失败，请重试';
                 errorMessage.style.display = 'block';
+                hasError = true;
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = '发送';
@@ -456,7 +461,13 @@
                 .then(data => {
                     console.log('Fetched conversations:', data.conversations);
                     conversationList.innerHTML = '';
+                    const renderedIds = new Set();
                     data.conversations.forEach(conv => {
+                        if (renderedIds.has(conv.id)) {
+                            console.warn(`Duplicate conversation ID detected: ${conv.id}`);
+                            return;
+                        }
+                        renderedIds.add(conv.id);
                         const li = document.createElement('li');
                         li.dataset.conversationId = conv.id;
                         if (conv.id === currentConversationId) {
@@ -512,7 +523,6 @@
                 });
         }
 
-        // Initial sidebar load
         updateSidebar();
     </script>
 </body>
