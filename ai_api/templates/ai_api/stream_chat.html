@@ -149,7 +149,7 @@
                 <div id="chat-box">
                     {% for message in chat_history %}
                         <div class="message {{ message.role }}-message">
-                            <strong>{{ message.role|capfirst }}:</strong>
+                            <strong>{{ message.role|capfirst }} ({{ message.timestamp|date:"Y-m-d H:i" }}):</strong>
                             <p>{{ message.content|safe }}</p>
                             <div class="message-timestamp">{{ message.timestamp|date:"Y-m-d H:i" }}</div>
                         </div>
