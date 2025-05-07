@@ -94,6 +94,7 @@ def stream_chat(request):
         body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
+        logger.info(f"Received model: {model}")  # Debug log
         conversation_id = body.get('conversation_id', None)
 
         if not conversation_id or conversation_id.strip() == '':
@@ -125,7 +126,6 @@ def stream_chat(request):
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
-        # Map roles to DeepSeek-compatible values
         messages = [
             {'role': 'assistant' if msg['role'] == 'ai' else msg['role'], 'content': msg['content']}
             for msg in history
@@ -133,6 +133,7 @@ def stream_chat(request):
         messages.append({'role': 'user', 'content': question})
 
         api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
+        logger.info(f"Using API model: {api_model}")  # Debug log
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json'
