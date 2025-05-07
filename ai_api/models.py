@@ -17,7 +17,7 @@ class ChatMessage(models.Model):
     is_stream = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ['timestamp']  # Oldest first for chronological display
         indexes = [
             models.Index(fields=['user', 'model_type']),
             models.Index(fields=['user', 'conversation_id', 'timestamp']),
@@ -28,5 +28,5 @@ class ChatMessage(models.Model):
 
     @property
     def title(self):
-        # 返回前20个字符作为对话标题，可以根据需要优化
-        return self.content[:20]
+        # Consistent with get_conversations: 30 characters
+        return self.content[:30]
