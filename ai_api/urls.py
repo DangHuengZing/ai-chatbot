@@ -8,4 +8,5 @@ urlpatterns = [
     path('stream_chat/<uuid:conversation_id>/', views.stream_chat_page, name='stream_chat_conversation'),
     path('chat/stream/', views.stream_chat, name='stream_chat'),
     path('chat/conversations/', views.get_conversations, name='get_conversations'),
+    path('chat/delete/<uuid:conversation_id>/', views.delete_conversation, name='delete_conversation'),
 ]
