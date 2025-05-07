@@ -94,7 +94,8 @@ def stream_chat(request):
         body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
-        logger.info(f"Received model: {model}")  # Debug log
+        logger.info(f"Request body: {body}")
+        logger.info(f"Received model: {model}")
         conversation_id = body.get('conversation_id', None)
 
         if not conversation_id or conversation_id.strip() == '':
@@ -132,8 +133,8 @@ def stream_chat(request):
         ]
         messages.append({'role': 'user', 'content': question})
 
-        api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
-        logger.info(f"Using API model: {api_model}")  # Debug log
+        api_model = "deepseek-chat" if model == "v3" else "deepseek-reasoner"
+        logger.info(f"Using API model: {api_model}")
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json'
@@ -143,6 +144,7 @@ def stream_chat(request):
             'messages': messages,
             'stream': True
         }
+        logger.info(f"Sending payload to DeepSeek: {payload}")
 
         response = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
