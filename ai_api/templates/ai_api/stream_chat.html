@@ -1,277 +1,378 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <title>HuengZing的助手</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
-  <style>
-    body {
-      background-color: #222;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: #fff;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-    #chat-container {
-      background: #333;
-      border-radius: 12px;
-      padding: 1.5rem;
-    }
-    #chat-box {
-      height: 60vh;
-      overflow-y: auto;
-      padding: 1rem;
-      background: #444;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-    }
-    .message {
-      margin: 1rem 0;
-      padding: 1rem;
-      border-radius: 8px;
-      background: #555;
-    }
-    .user-message { border-left: 4px solid #4299e1; }
-    .ai-message { border-left: 4px solid #28a745; }
-    button {
-      background: #28a745;
-      color: white;
-      border: none;
-      padding: 0.6rem 1.2rem;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    button:hover { background: #218838; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
-    textarea {
-      width: 100%;
-      padding: 0.8rem;
-      border: 2px solid #444;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      background-color: #444;
-      color: #fff;
-    }
-    .model-selector {
-      padding: 0.5rem;
-      border: 2px solid #444;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-      background-color: #444;
-      color: #fff;
-    }
-    #error-message {
-      color: red;
-      display: none;
-      padding: 10px;
-      border: 1px solid red;
-      background-color: #ffcccb;
-      margin-bottom: 15px;
-    }
-    .chat-history {
-      background-color: #444;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1rem;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    .chat-history li {
-      margin: 0.5rem 0;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>HuengZing的助手</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+    <style>
+        body {
+            background-color: #222;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .sidebar {
+            width: 250px;
+            background: #333;
+            padding: 1rem;
+            border-right: 1px solid #444;
+            overflow-y: auto;
+        }
+        .sidebar h3 {
+            margin-top: 0;
+            color: #f4f4f4;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .sidebar li {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+        .sidebar li:hover {
+            background: #444;
+        }
+        .sidebar li.active {
+            background: #28a745;
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+        }
+        #chat-container {
+            background: #333;
+            border-radius: 12px;
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background: #444;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .message {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #555;
+        }
+        .user-message { border-left: 4px solid #4299e1; }
+        .ai-message { border-left: 4px solid #28a745; }
+        .message-timestamp {
+            font-size: 0.8rem;
+            color: #bbb;
+            margin-top: 0.5rem;
+        }
+        button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #218838; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #444;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background-color: #444;
+            color: #fff;
+        }
+        .model-selector {
+            padding: 0.5rem;
+            border: 2px solid #444;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            background-color: #444;
+            color: #fff;
+        }
+        #error-message {
+            color: red;
+            display: none;
+            padding: 10px;
+            border: 1px solid red;
+            background-color: #ffcccb;
+            margin-bottom: 15px;
+        }
+    </style>
 </head>
 <body>
-  <div id="chat-container">
-    <h1>HuengZing的助手</h1>
-    <p>欢迎, {{ username }}! <button id="logout-btn" onclick="logout()">登出</button></p>
-    <div id="error-message"></div>
-    <div style="text-align: right;">
-      <button onclick="clearChat()">清空聊天记录</button>
+    <div class="container">
+        <div class="sidebar">
+            <h3>对话历史</h3>
+            <ul id="conversation-list">
+                {% for conv in conversations %}
+                    <li data-conversation-id="{{ conv.id }}" {% if conv.id == current_conversation_id %}class="active"{% endif %}>
+                        {{ conv.title|safe }}
+                    </li>
+                {% endfor %}
+            </ul>
+            <button onclick="startNewConversation()">新建对话</button>
+        </div>
+        <div class="main">
+            <div id="chat-container">
+                <h1>HuengZing的助手</h1>
+                <p>欢迎, {{ username }}! <button id="logout-btn" onclick="logout()">登出</button></p>
+                <div id="error-message"></div>
+                <div style="text-align: right;">
+                    <button onclick="clearChat()">清空聊天记录</button>
+                </div>
+                <select class="model-selector" id="model-select">
+                    <option value="v3">通用聊天模型 (v3)</option>
+                    <option value="r1">代码助手 (r1)</option>
+                </select>
+                <div id="chat-box">
+                    {% for message in chat_history %}
+                        <div class="message {{ message.role }}-message">
+                            <strong>{{ message.role|capfirst }}:</strong>
+                            <p>{{ message.content|safe }}</p>
+                            <div class="message-timestamp">{{ message.timestamp|date:"Y-m-d H:i" }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+                <form>
+                    {% csrf_token %}
+                    <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
+                    <div style="text-align: right; margin-top: 1rem;">
+                        <button id="send-btn" type="button" onclick="sendMessage()">发送</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <select class="model-selector" id="model-select">
-      <option value="v3">通用聊天模型 (v3)</option>
-      <option value="r1">代码助手 (r1)</option>
-    </select>
-    <div class="chat-history">
-      <h3>聊天记录</h3>
-      <ul id="chat-history-list">
-        {% for message in chat_history %}
-          <li>
-            <strong>{{ message.role|capfirst }} ({{ message.timestamp|date:"Y-m-d H:i" }}):</strong>
-            {{ message.content }}
-          </li>
-        {% endfor %}
-      </ul>
-    </div>
-    <div id="chat-box"></div>
-    <form>
-      {% csrf_token %}
-      <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
-      <div style="text-align: right; margin-top: 1rem;">
-        <button id="send-btn" type="button" onclick="sendMessage()">发送</button>
-      </div>
-    </form>
-  </div>
 
-  <script>
-    function getCookie(name) {
-      let cookieValue = null;
-      if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i].trim();
-          if (cookie.substring(0, name.length + 1) === (name + '=')) {
-            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-            break;
-          }
-        }
-      }
-      return cookieValue;
-    }
+    <script>
+        let controller = null;
+        const chatBox = document.getElementById('chat-box');
+        const sendBtn = document.getElementById('send-btn');
+        const errorMessage = document.getElementById('error-message');
+        let currentConversationId = '{{ current_conversation_id|default:"" }}';
 
-    function logout() {
-      const logoutBtn = document.getElementById('logout-btn');
-      logoutBtn.disabled = true;
-      logoutBtn.textContent = '登出中...';
-      fetch('/logout/', { method: 'GET' })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            window.location.href = '/login/';
-          }
-        })
-        .catch(err => {
-          console.error('登出错误:', err);
-          alert('登出失败，请重试');
-        })
-        .finally(() => {
-          logoutBtn.disabled = false;
-          logoutBtn.textContent = '登出';
-        });
-    }
-
-    let controller = null;
-    const chatBox = document.getElementById('chat-box');
-    const sendBtn = document.getElementById('send-btn');
-    const errorMessage = document.getElementById('error-message');
-
-    function handleKeydown(event) {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        sendMessage();
-      }
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById('user-input');
-      const question = input.value.trim();
-      const model = document.getElementById('model-select').value;
-      if (!question) return;
-
-      sendBtn.disabled = true;
-      sendBtn.textContent = '发送中...';
-      input.value = '';
-      errorMessage.style.display = 'none';
-
-      const userMsg = document.createElement('div');
-      userMsg.className = 'message user-message';
-      userMsg.innerHTML = `<strong>您:</strong><p>${question}</p>`;
-      chatBox.appendChild(userMsg);
-
-      const aiMsg = document.createElement('div');
-      aiMsg.className = 'message ai-message';
-      aiMsg.innerHTML = '<strong>AI助手:</strong><p>思考中...</p>';
-      chatBox.appendChild(aiMsg);
-
-      chatBox.scrollTop = chatBox.scrollHeight;
-
-      const csrftoken = getCookie('csrftoken');
-      if (!csrftoken) {
-        console.error('CSRF token not found');
-        errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
-        errorMessage.style.display = 'block';
-        sendBtn.disabled = false;
-        sendBtn.textContent = '发送';
-        return;
-      }
-
-      try {
-        const response = await fetch('/chat/stream/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrftoken
-          },
-          body: JSON.stringify({ question, model })
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
         }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let currentContent = '';
+        function logout() {
+            const logoutBtn = document.getElementById('logout-btn');
+            logoutBtn.disabled = true;
+            logoutBtn.textContent = '登出中...';
+            fetch('/logout/', { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/login/';
+                    }
+                })
+                .catch(err => {
+                    console.error('登出错误:', err);
+                    errorMessage.textContent = '登出失败，请重试';
+                    errorMessage.style.display = 'block';
+                })
+                .finally(() => {
+                    logoutBtn.disabled = false;
+                    logoutBtn.textContent = '登出';
+                });
+        }
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        function handleKeydown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n\n');
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const question = input.value.trim();
+            const model = document.getElementById('model-select').value;
+            if (!question) return;
 
-          for (let line of lines.slice(0, -1)) {
-            if (!line.startsWith('data: ')) continue;
-            const rawData = line.replace('data: ', '').trim();
-            if (rawData === '[DONE]') break;
+            sendBtn.disabled = true;
+            sendBtn.textContent = '发送中...';
+            input.value = '';
+            errorMessage.style.display = 'none';
+
+            const userMsg = document.createElement('div');
+            userMsg.className = 'message user-message';
+            userMsg.innerHTML = `
+                <strong>您:</strong><p>${question}</p>
+                <div class="message-timestamp">${new Date().toLocaleString('zh-CN')}</div>
+            `;
+            chatBox.appendChild(userMsg);
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'message ai-message';
+            aiMsg.innerHTML = '<strong>AI助手:</strong><p>思考中...</p>';
+            chatBox.appendChild(aiMsg);
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const csrftoken = getCookie('csrftoken');
+            if (!csrftoken) {
+                console.error('CSRF token not found');
+                errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
+                errorMessage.style.display = 'block';
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
+                return;
+            }
 
             try {
-              const data = JSON.parse(rawData);
-              if (data.error) {
-                aiMsg.querySelector('p').textContent = data.error;
-                errorMessage.textContent = data.error;
+                const response = await fetch('/chat/stream/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: JSON.stringify({ question, model, conversation_id: currentConversationId })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let currentContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+
+                    for (let line of lines.slice(0, -1)) {
+                        if (!line.startsWith('data: ')) continue;
+                        const rawData = line.replace('data: ', '').trim();
+                        if (rawData === '[DONE]') break;
+
+                        try {
+                            const data = JSON.parse(rawData);
+                            if (data.error) {
+                                aiMsg.querySelector('p').textContent = data.error;
+                                errorMessage.textContent = data.error;
+                                errorMessage.style.display = 'block';
+                                break;
+                            }
+                            currentContent += data.content || '';
+                            aiMsg.innerHTML = `
+                                <strong>AI助手:</strong><p>${renderMarkdown(currentContent)}</p>
+                                <div class="message-timestamp">${new Date().toLocaleString('zh-CN')}</div>
+                            `;
+                            chatBox.scrollTop = chatBox.scrollHeight;
+                            if (data.conversation_id && !currentConversationId) {
+                                currentConversationId = data.conversation_id;
+                                updateSidebar();
+                            }
+                        } catch (e) {
+                            console.error('解析错误:', rawData, e);
+                            aiMsg.querySelector('p').textContent = '解析失败';
+                            errorMessage.textContent = '解析失败';
+                            errorMessage.style.display = 'block';
+                            break;
+                        }
+                    }
+                    buffer = lines[lines.length - 1];
+                }
+            } catch (error) {
+                console.error('请求错误:', error);
+                aiMsg.querySelector('p').textContent = '请求失败，请重试';
+                errorMessage.textContent = '请求失败，请重试';
                 errorMessage.style.display = 'block';
-                break;
-              }
-              currentContent += data.content || '';
-              aiMsg.querySelector('p').innerHTML = renderMarkdown(currentContent);
-              chatBox.scrollTop = chatBox.scrollHeight;
-            } catch (e) {
-              console.error('解析错误:', rawData, e);
-              aiMsg.querySelector('p').textContent = '解析失败';
-              errorMessage.textContent = '解析失败';
-              errorMessage.style.display = 'block';
-              break;
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送';
             }
-          }
-          buffer = lines[lines.length - 1];
         }
-      } catch (error) {
-        console.error('请求错误:', error);
-        aiMsg.querySelector('p').textContent = '请求失败，请重试';
-        errorMessage.textContent = '请求失败，请重试';
-        errorMessage.style.display = 'block';
-      } finally {
-        sendBtn.disabled = false;
-        sendBtn.textContent = '发送';
-      }
-    }
 
-    function renderMarkdown(text) {
-      const rawHtml = marked.parse(text);
-      return DOMPurify.sanitize(rawHtml);
-    }
+        function renderMarkdown(text) {
+            const rawHtml = marked.parse(text);
+            return DOMPurify.sanitize(rawHtml);
+        }
 
-    function clearChat() {
-      chatBox.innerHTML = '';
-      document.getElementById('user-input').value = '';
-      errorMessage.style.display = 'none';
-    }
-  </script>
+        function clearChat() {
+            chatBox.innerHTML = '';
+            document.getElementById('user-input').value = '';
+            errorMessage.style.display = 'none';
+        }
+
+        function startNewConversation() {
+            currentConversationId = '';
+            chatBox.innerHTML = '';
+            errorMessage.style.display = 'none';
+            updateSidebar();
+        }
+
+        function updateSidebar() {
+            const conversationList = document.getElementById('conversation-list');
+            fetch('/chat/conversations/', {
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch conversations');
+                    return response.json();
+                })
+                .then(data => {
+                    conversationList.innerHTML = '';
+                    data.conversations.forEach(conv => {
+                        const li = document.createElement('li');
+                        li.dataset.conversationId = conv.id;
+                        li.textContent = DOMPurify.sanitize(conv.title);
+                        if (conv.id === currentConversationId) {
+                            li.className = 'active';
+                        }
+                        li.onclick = () => {
+                            window.location.href = `/stream_chat/${conv.id}/`;
+                        };
+                        conversationList.appendChild(li);
+                    });
+                })
+                .catch(err => {
+                    console.error('侧边栏更新错误:', err);
+                    errorMessage.textContent = '无法加载对话列表';
+                    errorMessage.style.display = 'block';
+                });
+        }
+    </script>
 </body>
 </html>
