@@ -302,7 +302,17 @@
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        if (currentContent) {
+                            aiMsg.innerHTML = `
+                                <strong>AI助手:</strong>
+                                <p>${renderMarkdown(currentContent)}</p>
+                                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                            `;
+                            chatBox.scrollTop = chatBox.scrollHeight;
+                        }
+                        break;
+                    }
 
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n\n');
@@ -364,7 +374,7 @@
         }
 
         function startNewConversation() {
-            currentConversationId = null;  // Let backend generate new ID
+            currentConversationId = null;
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
             updateSidebar();
@@ -382,6 +392,7 @@
                     return response.json();
                 })
                 .then(data => {
+                    console.log('Fetched conversations:', data.conversations);
                     conversationList.innerHTML = '';
                     data.conversations.forEach(conv => {
                         const li = document.createElement('li');
