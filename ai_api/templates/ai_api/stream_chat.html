@@ -306,7 +306,7 @@
             const input = document.getElementById('user-input');
             const question = input.value.trim();
             const model = document.getElementById('model-select').value;
-            console.log('Selected model:', model); // Debug log
+            console.log('Selected model:', model);
             if (!question) return;
 
             sendBtn.disabled = true;
@@ -397,13 +397,17 @@
                                 hasError = true;
                                 break;
                             }
-                            currentContent += data.content || '';
+                            const delta = data.content || '';
+                            console.log('Received chunk:', delta); // Debug streaming
+                            currentContent += delta;
                             aiMsg.innerHTML = `
                                 <strong>AI助手:</strong>
                                 <p>${renderMarkdown(currentContent)}</p>
                                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
                             `;
                             chatBox.scrollTop = chatBox.scrollHeight;
+                            // Add slight delay to ensure smooth rendering (optional)
+                            await new Promise(resolve => setTimeout(resolve, 10));
                             if (data.conversation_id && !currentConversationId) {
                                 currentConversationId = data.conversation_id;
                             }
@@ -446,7 +450,6 @@
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
             updateSidebar();
-            // Reset model selector to default (optional, if desired)
             document.getElementById('model-select').value = 'v3';
         }
 
