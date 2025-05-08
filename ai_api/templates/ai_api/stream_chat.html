@@ -173,7 +173,7 @@
                     {% for message in chat_history %}
                         <div class="message {{ message.role }}-message">
                             <strong>{{ message.role|capfirst }}:</strong>
-                            <p>{{ message.content|safe }}</p>
+                            <p class="message-content"></p>
                             <div class="message-timestamp">{{ message.timestamp|date:"Y-m-d H:i" }}</div>
                         </div>
                     {% endfor %}
@@ -201,6 +201,12 @@
             currentConversationId = null;
         }
         console.log("Initial currentConversationId:", currentConversationId);
+
+        // Render historical messages with Markdown
+        document.querySelectorAll('.message-content').forEach((element, index) => {
+            const rawContent = {{ message.content|safe|tojson }};
+            element.innerHTML = renderMarkdown(rawContent);
+        });
 
         function getCookie(name) {
             let cookieValue = null;
