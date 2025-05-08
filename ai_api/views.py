@@ -126,7 +126,10 @@ def stream_chat(request):
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
-        messages = [{'role': msg['role'], 'content': msg['content']} for msg in history]
+        messages = [
+            {'role': 'assistant' if msg['role'] == 'ai' else msg['role'], 'content': msg['content']}
+            for msg in history
+        ]
         messages.append({'role': 'user', 'content': question})
 
         api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"
