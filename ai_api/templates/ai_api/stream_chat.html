@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HuengZing的助手</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
@@ -14,36 +15,41 @@
             padding: 0;
             display: flex;
             height: 100vh;
+            overflow: hidden;
         }
         .container {
             display: flex;
             width: 100%;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         .sidebar {
-            width: 250px;
+            width: 280px;
             background: #333;
-            padding: 1rem;
+            padding: 1.5rem;
             border-right: 1px solid #444;
             overflow-y: auto;
+            flex-shrink: 0;
         }
         .sidebar h3 {
-            margin-top: 0;
+            margin: 0 0 1rem;
             color: #f4f4f4;
+            font-size: 1.2rem;
         }
         .sidebar ul {
             list-style: none;
             padding: 0;
+            margin: 0;
         }
         .sidebar li {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.5rem;
+            padding: 0.75rem;
             cursor: pointer;
-            border-radius: 4px;
+            border-radius: 6px;
             margin-bottom: 0.5rem;
+            transition: background 0.2s;
         }
         .sidebar li:hover {
             background: #444;
@@ -53,8 +59,12 @@
         }
         .sidebar .delete-btn {
             background: #dc3545;
-            padding: 0.2rem 0.5rem;
+            padding: 0.3rem 0.6rem;
             font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
         }
         .sidebar .delete-btn:hover {
             background: #c82333;
@@ -64,6 +74,7 @@
             display: flex;
             flex-direction: column;
             padding: 2rem;
+            overflow: hidden;
         }
         #chat-container {
             background: #333;
@@ -72,17 +83,19 @@
             flex: 1;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
         #chat-box {
             flex: 1;
             overflow-y: auto;
-            padding: 1rem;
+            padding: 1.5rem;
             background: #444;
             border-radius: 8px;
             margin-bottom: 1rem;
+            scroll-behavior: smooth;
         }
         .message {
-            margin: 1.5rem 0;
+            margin: 1rem 0;
             padding: 1rem;
             border-radius: 8px;
             background: #555;
@@ -124,6 +137,8 @@
             margin-bottom: 1rem;
             background-color: #444;
             color: #fff;
+            resize: vertical;
+            min-height: 80px;
         }
         .model-selector {
             padding: 0.5rem;
@@ -132,14 +147,38 @@
             margin-bottom: 1rem;
             background-color: #444;
             color: #fff;
+            width: 200px;
         }
         #error-message {
-            color: red;
+            color: #dc3545;
             display: none;
             padding: 10px;
-            border: 1px solid red;
+            border: 1px solid #dc3545;
             background-color: #ffcccb;
             margin-bottom: 15px;
+            border-radius: 6px;
+        }
+        #scroll-to-bottom {
+            position: absolute;
+            bottom: 150px;
+            right: 30px;
+            background: #28a745;
+            padding: 0.5rem;
+            border-radius: 50%;
+            display: none;
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                max-height: 200px;
+            }
+            .main {
+                padding: 1rem;
+            }
         }
     </style>
 </head>
@@ -159,16 +198,16 @@
         </div>
         <div class="main">
             <div id="chat-container">
-                <h1>HuengZing的助手</h1>
+                <h1>HuêtsZing的助手</h1>
                 <p>欢迎, {{ username }}! <button id="logout-btn" onclick="logout()">登出</button></p>
                 <div id="error-message"></div>
-                <div style="text-align: right;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <select class="model-selector" id="model-select">
+                        <option value="v3">通用聊天模型 (v3)</option>
+                        <option value="r1">代码助手 (r1)</option>
+                    </select>
                     <button onclick="clearChat()">清空聊天记录</button>
                 </div>
-                <select class="model-selector" id="model-select">
-                    <option value="v3">通用聊天模型 (v3)</option>
-                    <option value="r1">代码助手 (r1)</option>
-                </select>
                 <div id="chat-box">
                     {% for message in chat_history %}
                         <div class="message {{ message.role }}-message" data-content="{{ message.content|escape }}">
@@ -178,6 +217,7 @@
                         </div>
                     {% endfor %}
                 </div>
+                <button id="scroll-to-bottom" title="滚动到底部" onclick="scrollToBottom()">↓</button>
                 <form>
                     {% csrf_token %}
                     <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
@@ -190,23 +230,54 @@
     </div>
 
     <script>
-        let controller = null;
+        let currentConversationId = '{{ current_conversation_id|default:"" }}';
         const chatBox = document.getElementById('chat-box');
         const sendBtn = document.getElementById('send-btn');
         const errorMessage = document.getElementById('error-message');
-        let currentConversationId = '{{ current_conversation_id|default:"" }}';
+        const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
+        let isUserScrolling = false;
+        let lastSidebarUpdate = 0;
+        const sidebarUpdateDebounce = 1000; // 1 second debounce
 
         // Normalize currentConversationId
         if (currentConversationId === '') {
             currentConversationId = null;
         }
-        console.log("Initial currentConversationId:", currentConversationId);
 
-        // Render historical messages with Markdown
+        // Initialize Markdown rendering for historical messages
         document.querySelectorAll('.message').forEach(messageElement => {
             const rawContent = messageElement.getAttribute('data-content');
             const contentElement = messageElement.querySelector('.message-content');
             contentElement.innerHTML = renderMarkdown(rawContent);
+            autoScroll();
+        });
+
+        // Auto-scroll logic
+        function autoScroll() {
+            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+            if (isNearBottom && !isUserScrolling) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+                scrollToBottomBtn.style.display = 'none';
+            } else {
+                scrollToBottomBtn.style.display = 'block';
+            }
+        }
+
+        // Scroll to bottom manually
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollToBottomBtn.style.display = 'none';
+            isUserScrolling = false;
+        }
+
+        // Detect user scrolling
+        chatBox.addEventListener('scroll', () => {
+            isUserScrolling = true;
+            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+            scrollToBottomBtn.style.display = isNearBottom ? 'none' : 'block';
+            if (isNearBottom) {
+                isUserScrolling = false;
+            }
         });
 
         function getCookie(name) {
@@ -272,6 +343,7 @@
                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
             `;
             chatBox.appendChild(userMsg);
+            autoScroll();
 
             const aiMsg = document.createElement('div');
             aiMsg.className = 'message ai-message';
@@ -281,8 +353,7 @@
                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
             `;
             chatBox.appendChild(aiMsg);
-
-            chatBox.scrollTop = chatBox.scrollHeight;
+            autoScroll();
 
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) {
@@ -293,8 +364,6 @@
                 sendBtn.textContent = '发送';
                 return;
             }
-
-            console.log("Sending message with conversation_id:", currentConversationId);
 
             try {
                 const response = await fetch('/chat/stream/', {
@@ -341,11 +410,10 @@
                                 <p>${renderMarkdown(currentContent)}</p>
                                 <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
                             `;
-                            chatBox.scrollTop = chatBox.scrollHeight;
+                            autoScroll();
                             if (data.conversation_id && !currentConversationId) {
                                 currentConversationId = data.conversation_id;
-                                console.log("Updated currentConversationId:", currentConversationId);
-                                updateSidebar();
+                                debounceUpdateSidebar();
                             }
                         } catch (e) {
                             console.error('解析错误:', rawData, e);
@@ -365,6 +433,7 @@
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = '发送';
+                autoScroll();
             }
         }
 
@@ -377,14 +446,24 @@
             chatBox.innerHTML = '';
             document.getElementById('user-input').value = '';
             errorMessage.style.display = 'none';
+            autoScroll();
         }
 
         function startNewConversation() {
             currentConversationId = null;
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
-            console.log("Starting new conversation, currentConversationId:", currentConversationId);
-            updateSidebar();
+            debounceUpdateSidebar();
+        }
+
+        function debounceUpdateSidebar() {
+            const now = Date.now();
+            if (now - lastSidebarUpdate > sidebarUpdateDebounce) {
+                lastSidebarUpdate = now;
+                updateSidebar();
+            } else {
+                setTimeout(debounceUpdateSidebar, sidebarUpdateDebounce);
+            }
         }
 
         function updateSidebar() {
@@ -401,19 +480,21 @@
                 .then(data => {
                     conversationList.innerHTML = '';
                     data.conversations.forEach(conv => {
-                        const li = document.createElement('li');
-                        li.dataset.conversationId = conv.id;
-                        if (conv.id === currentConversationId) {
-                            li.className = 'active';
+                        if (!document.querySelector(`li[data-conversation-id="${conv.id}"]`)) {
+                            const li = document.createElement('li');
+                            li.dataset.conversationId = conv.id;
+                            if (conv.id === currentConversationId) {
+                                li.className = 'active';
+                            }
+                            li.innerHTML = `
+                                <span class="title">${DOMPurify.sanitize(conv.title)}</span>
+                                <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
+                            `;
+                            li.querySelector('.title').onclick = () => {
+                                window.location.href = `/stream_chat/${conv.id}/`;
+                            };
+                            conversationList.appendChild(li);
                         }
-                        li.innerHTML = `
-                            <span class="title">${DOMPurify.sanitize(conv.title)}</span>
-                            <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
-                        `;
-                        li.querySelector('.title').onclick = () => {
-                            window.location.href = `/stream_chat/${conv.id}/`;
-                        };
-                        conversationList.appendChild(li);
                     });
                 })
                 .catch(err => {
@@ -443,7 +524,7 @@
                         if (conversationId === currentConversationId) {
                             startNewConversation();
                         } else {
-                            updateSidebar();
+                            debounceUpdateSidebar();
                         }
                     } else {
                         throw new Error(data.error || '删除失败');
