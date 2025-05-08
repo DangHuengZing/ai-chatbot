@@ -196,10 +196,11 @@
         const errorMessage = document.getElementById('error-message');
         let currentConversationId = '{{ current_conversation_id|default:"" }}';
 
-        // Normalize currentConversationId: convert empty string to null
+        // Normalize currentConversationId
         if (currentConversationId === '') {
             currentConversationId = null;
         }
+        console.log("Initial currentConversationId:", currentConversationId);
 
         function getCookie(name) {
             let cookieValue = null;
@@ -286,6 +287,8 @@
                 return;
             }
 
+            console.log("Sending message with conversation_id:", currentConversationId);
+
             try {
                 const response = await fetch('/chat/stream/', {
                     method: 'POST',
@@ -334,6 +337,7 @@
                             chatBox.scrollTop = chatBox.scrollHeight;
                             if (data.conversation_id && !currentConversationId) {
                                 currentConversationId = data.conversation_id;
+                                console.log("Updated currentConversationId:", currentConversationId);
                                 updateSidebar();
                             }
                         } catch (e) {
@@ -369,9 +373,10 @@
         }
 
         function startNewConversation() {
-            currentConversationId = null;  // Explicitly set to null
+            currentConversationId = null;
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
+            console.log("Starting new conversation, currentConversationId:", currentConversationId);
             updateSidebar();
         }
 
