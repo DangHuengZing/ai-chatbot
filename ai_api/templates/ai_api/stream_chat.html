@@ -196,6 +196,11 @@
         const errorMessage = document.getElementById('error-message');
         let currentConversationId = '{{ current_conversation_id|default:"" }}';
 
+        // Normalize currentConversationId: convert empty string to null
+        if (currentConversationId === '') {
+            currentConversationId = null;
+        }
+
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -364,7 +369,7 @@
         }
 
         function startNewConversation() {
-            currentConversationId = '';
+            currentConversationId = null;  // Explicitly set to null
             chatBox.innerHTML = '';
             errorMessage.style.display = 'none';
             updateSidebar();
