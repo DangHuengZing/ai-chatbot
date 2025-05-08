@@ -61,16 +61,18 @@ def stream_chat_page(request, conversation_id=None):
     else:
         chat_history = ChatMessage.objects.filter(user=request.user).order_by('timestamp')[:50]
 
+    # Fetch distinct conversations and their first messages
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
         first_message = ChatMessage.objects.filter(
             user=request.user, conversation_id=conv['conversation_id']
         ).order_by('timestamp').first()
-        conversation_list.append({
-            'id': str(conv['conversation_id']),
-            'title': first_message.title if first_message else '未命名对话'
-        })
+        if first_message:  # Only include valid conversations
+            conversation_list.append({
+                'id': str(conv['conversation_id']),
+                'title': first_message.title if first_message.title else first_message.content[:30] or '未命名对话'
+            })
 
     return render(request, 'ai_api/stream_chat.html', {
         'username': request.user.username,
@@ -107,14 +109,20 @@ def stream_chat(request):
                 conversation_id = str(uuid.uuid4())
                 logger.info(f"Generated new conversation_id: {conversation_id}")
 
-        ChatMessage.objects.create(
-            user=request.user,
-            conversation_id=conversation_id,
-            model_type=model,
-            role='user',
-            content=question,
-            is_stream=True
-        )
+        # Check if conversation already exists to prevent duplicates
+        existing_conversation = ChatMessage.objects.filter(
+            user=request.user, conversation_id=conversation_id
+        ).exists()
+        if not existing_conversation:
+            ChatMessage.objects.create(
+                user=request.user,
+                conversation_id=conversation_id,
+                model_type=model,
+                role='user',
+                content=question,
+                is_stream=True,
+                title=question[:30]  # Set title to first 30 chars of question
+            )
 
         if not hasattr(settings, 'DEEPSEEK_API_KEY'):
             logger.error("DeepSeek API key not configured")
@@ -221,10 +229,11 @@ def get_conversations(request):
         first_message = ChatMessage.objects.filter(
             user=request.user, conversation_id=conv['conversation_id']
         ).order_by('timestamp').first()
-        conversation_list.append({
-            'id': str(conv['conversation_id']),
-            'title': first_message.title if first_message else '未命名对话'
-        })
+        if first_message:
+            conversation_list.append({
+                'id': str(conv['conversation_id']),
+                'title': first_message.title if first_message.title else first_message.content[:30] or '未命名对话'
+            })
     return JsonResponse({'conversations': conversation_list})
 
 @login_required
