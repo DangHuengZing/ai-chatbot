@@ -2,33 +2,195 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HuengZing的助手</title>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
     <style>
-        body { background-color: #222; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; margin: 0; padding: 0; display: flex; height: 100vh; }
-        .container { display: flex; width: 100%; max-width: 1200px; margin: 0 auto; }
-        .sidebar { width: 250px; background: #333; padding: 1rem; border-right: 1px solid #444; overflow-y: auto; }
-        .sidebar h3 { margin-top: 0; color: #f4f4f4; }
-        .sidebar ul { list-style: none; padding: 0; }
-        .sidebar li { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; cursor: pointer; border-radius: 4px; margin-bottom: 0.5rem; }
-        .sidebar li:hover { background: #444; }
-        .sidebar li.active { background: #28a745; }
-        .sidebar .delete-btn { background: #dc3545; padding: 0.2rem 0.5rem; font-size: 0.8rem; }
-        .sidebar .delete-btn:hover { background: #c82333; }
-        .main { flex: 1; display: flex; flex-direction: column; padding: 2rem; }
-        #chat-container { background: #333; border-radius: 12px; padding: 1.5rem; flex: 1; display: flex; flex-direction: column; }
-        #chat-box { flex: 1; overflow-y: auto; padding: 1rem; background: #444; border-radius: 8px; margin-bottom: 1rem; }
-        .message { margin: 1.5rem 0; padding: 1rem; border-radius: 8px; background: #555; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
-        .user-message { border-left: 4px solid #4299e1; }
-        .ai-message { border-left: 4px solid #28a745; }
-        .message-timestamp { font-size: 0.8rem; color: #bbb; margin-top: 0.5rem; text-align: right; }
-        button { background: #28a745; color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
-        button:hover { background: #218838; }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        textarea { width: 100%; padding: 0.8rem; border: 2px solid #444; border-radius: 8px; margin-bottom: 1rem; background-color: #444; color: #fff; }
-        .model-selector { padding: 0.5rem; border: 2px solid #444; border-radius: 6px; margin-bottom: 1rem; background-color: #444; color: #fff; }
-        #error-message { color: red; display: none; padding: 10px; border: 1px solid red; background-color: #ffcccb; margin-bottom: 15px; }
+        body {
+            background-color: #222;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .sidebar {
+            width: 280px;
+            background: #333;
+            padding: 1.5rem;
+            border-right: 1px solid #444;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+        .sidebar h3 {
+            margin: 0 0 1rem;
+            color: #f4f4f4;
+            font-size: 1.2rem;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            transition: background 0.2s;
+        }
+        .sidebar li:hover {
+            background: #444;
+        }
+        .sidebar li.active {
+            background: #28a745;
+        }
+        .sidebar .delete-btn {
+            background: #dc3545;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.8rem;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+        }
+        .sidebar .delete-btn:hover {
+            background: #c82333;
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+            overflow: hidden;
+        }
+        #chat-container {
+            background: #333;
+            border-radius: 12px;
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            background: #444;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            scroll-behavior: smooth;
+        }
+        .message {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #555;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .user-message {
+            border-left: 4px solid #4299e1;
+        }
+        .ai-message {
+            border-left: 4px solid #28a745;
+        }
+        .message-timestamp {
+            font-size: 0.8rem;
+            color: #bbb;
+            margin-top: 0.5rem;
+            text-align: right;
+        }
+        button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #218838;
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        textarea {
+            width: 100%;
+            padding: 0.8rem;
+            border: 2px solid #444;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            background-color: #444;
+            color: #fff;
+            resize: vertical;
+            min-height: 80px;
+        }
+        .model-selector {
+            padding: 0.5rem;
+            border: 2px solid #444;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            background-color: #444;
+            color: #fff;
+            width: 200px;
+        }
+        #error-message {
+            color: #dc3545;
+            display: none;
+            padding: 10px;
+            border: 1px solid #dc3545;
+            background-color: #ffcccb;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            position: relative;
+        }
+        #error-message .close-btn {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #scroll-to-bottom {
+            position: absolute;
+            bottom: 150px;
+            right: 30px;
+            background: #28a745;
+            padding: 0.5rem;
+            border-radius: 50%;
+            display: none;
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                max-height: 200px;
+            }
+            .main {
+                padding: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -36,12 +198,7 @@
         <div class="sidebar">
             <h3>对话历史</h3>
             <ul id="conversation-list">
-                {% for conv in conversations %}
-                    <li data-conversation-id="{{ conv.id }}" {% if conv.id == current_conversation_id %}class="active"{% endif %}>
-                        <span class="title">{{ conv.title|safe }}</span>
-                        <button class="delete-btn" onclick="deleteConversation('{{ conv.id }}')">删除</button>
-                    </li>
-                {% endfor %}
+                <!-- 对话列表将动态加载 -->
             </ul>
             <button onclick="startNewConversation()">新建对话</button>
         </div>
@@ -49,44 +206,79 @@
             <div id="chat-container">
                 <h1>HuengZing的助手</h1>
                 <p>欢迎, {{ username }}! <button id="logout-btn" onclick="logout()">登出</button></p>
-                <div id="error-message"></div>
-                <div style="text-align: right;">
+                <div id="error-message"><span></span><button class="close-btn" onclick="hideError()">×</button></div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <select class="model-selector" id="model-select">
+                        <option value="v3">通用聊天模型 (v3)</option>
+                        <option value="r1">代码助手 (r1)</option>
+                    </select>
                     <button onclick="clearChat()">清空聊天记录</button>
                 </div>
-                <select class="model-selector" id="model-select">
-                    <option value="v3">通用聊天模型 (v3)</option>
-                    <option value="r1">代码助手 (r1)</option>
-                </select>
                 <div id="chat-box">
-                    {% for message in chat_history %}
-                        <div class="message {{ message.role }}-message" data-content="{{ message.content|escape }}">
-                            <strong>{{ message.role|capfirst }}:</strong>
-                            <p class="message-content"></p>
-                            <div class="message-timestamp">{{ message.timestamp|date:"Y-m-d H:i" }}</div>
-                        </div>
-                    {% endfor %}
+                    <!-- 聊天记录将动态加载 -->
                 </div>
-                <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
-                <div style="text-align: right; margin-top: 1rem;">
-                    <button id="send-btn" type="button" onclick="sendMessage()">发送</button>
-                </div>
+                <button id="scroll-to-bottom" title="滚动到底部" onclick="scrollToBottom()">↓</button>
+                <form>
+                    {% csrf_token %}
+                    <textarea id="user-input" placeholder="输入问题...(Shift+Enter换行)" onkeydown="handleKeydown(event)"></textarea>
+                    <div style="text-align: right; margin-top: 1rem;">
+                        <button id="send-btn" type="button" onclick="sendMessage()">发送</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
     <script>
+        let currentConversationId = '{{ current_conversation_id|default:"" }}';
         const chatBox = document.getElementById('chat-box');
         const sendBtn = document.getElementById('send-btn');
         const errorMessage = document.getElementById('error-message');
-        let currentConversationId = '{{ current_conversation_id|default:"" }}';
+        const errorMessageText = errorMessage.querySelector('span');
+        const scrollToBottomBtn = document.getElementById('scroll-to-bottom');
         let isUserScrolling = false;
+        let lastSidebarUpdate = 0;
+        const sidebarUpdateDebounce = 1000; // 1 second debounce
 
-        if (currentConversationId === '') currentConversationId = null;
+        // Normalize currentConversationId
+        if (currentConversationId === '') {
+            currentConversationId = null;
+        }
 
+        // Initialize Markdown rendering for historical messages
         document.querySelectorAll('.message').forEach(messageElement => {
             const rawContent = messageElement.getAttribute('data-content');
             const contentElement = messageElement.querySelector('.message-content');
             contentElement.innerHTML = renderMarkdown(rawContent);
+            autoScroll();
+        });
+
+        // Auto-scroll logic
+        function autoScroll() {
+            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+            if (isNearBottom && !isUserScrolling) {
+                chatBox.scrollTop = chatBox.scrollHeight;
+                scrollToBottomBtn.style.display = 'none';
+            } else {
+                scrollToBottomBtn.style.display = 'block';
+            }
+        }
+
+        // Scroll to bottom manually
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollToBottomBtn.style.display = 'none';
+            isUserScrolling = false;
+        }
+
+        // Detect user scrolling
+        chatBox.addEventListener('scroll', () => {
+            isUserScrolling = true;
+            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
+            scrollToBottomBtn.style.display = isNearBottom ? 'none' : 'block';
+            if (isNearBottom) {
+                isUserScrolling = false;
+            }
         });
 
         function getCookie(name) {
@@ -104,16 +296,31 @@
             return cookieValue;
         }
 
+        function hideError() {
+            errorMessage.style.display = 'none';
+            errorMessageText.textContent = '';
+        }
+
+        function showError(message) {
+            errorMessageText.textContent = message;
+            errorMessage.style.display = 'block';
+            setTimeout(hideError, 5000); // 5秒后自动隐藏
+        }
+
         function logout() {
             const logoutBtn = document.getElementById('logout-btn');
             logoutBtn.disabled = true;
             logoutBtn.textContent = '登出中...';
             fetch('/logout/', { method: 'GET' })
                 .then(response => response.json())
-                .then(data => { if (data.success) window.location.href = '/login/'; })
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/login/';
+                    }
+                })
                 .catch(err => {
-                    errorMessage.textContent = '登出失败，请重试';
-                    errorMessage.style.display = 'block';
+                    console.error('登出错误:', err);
+                    showError('登出失败，请重试');
                 })
                 .finally(() => {
                     logoutBtn.disabled = false;
@@ -128,12 +335,6 @@
             }
         }
 
-        function autoScroll() {
-            if (!isUserScrolling) {
-                chatBox.scrollTop = chatBox.scrollHeight;
-            }
-        }
-
         async function sendMessage() {
             const input = document.getElementById('user-input');
             const question = input.value.trim();
@@ -143,24 +344,32 @@
             sendBtn.disabled = true;
             sendBtn.textContent = '发送中...';
             input.value = '';
-            errorMessage.style.display = 'none';
+            hideError();
 
             const userMsg = document.createElement('div');
             userMsg.className = 'message user-message';
-            userMsg.innerHTML = `<strong>您:</strong><p>${DOMPurify.sanitize(question)}</p><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
+            userMsg.innerHTML = `
+                <strong>您:</strong>
+                <p>${DOMPurify.sanitize(question)}</p>
+                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+            `;
             chatBox.appendChild(userMsg);
             autoScroll();
 
             const aiMsg = document.createElement('div');
             aiMsg.className = 'message ai-message';
-            aiMsg.innerHTML = `<strong>AI助手:</strong><p>思考中...</p><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
+            aiMsg.innerHTML = `
+                <strong>AI助手:</strong>
+                <p>思考中...</p>
+                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+            `;
             chatBox.appendChild(aiMsg);
             autoScroll();
 
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) {
-                errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
-                errorMessage.style.display = 'block';
+                console.error('CSRF token not found');
+                showError('无法获取 CSRF token，请刷新页面');
                 sendBtn.disabled = false;
                 sendBtn.textContent = '发送';
                 return;
@@ -169,11 +378,16 @@
             try {
                 const response = await fetch('/chat/stream/', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
                     body: JSON.stringify({ question, model, conversation_id: currentConversationId })
                 });
 
-                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -186,95 +400,146 @@
 
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n\n');
+
                     for (let line of lines.slice(0, -1)) {
                         if (!line.startsWith('data: ')) continue;
                         const rawData = line.replace('data: ', '').trim();
                         if (rawData === '[DONE]') break;
 
-                        const data = JSON.parse(rawData);
-                        if (data.error) {
-                            aiMsg.querySelector('p').textContent = data.error;
-                            errorMessage.textContent = data.error;
-                            errorMessage.style.display = 'block';
+                        try {
+                            const data = JSON.parse(rawData);
+                            if (data.error) {
+                                aiMsg.querySelector('p').textContent = data.error;
+                                showError(data.error);
+                                break;
+                            }
+                            currentContent += data.content || '';
+                            aiMsg.innerHTML = `
+                                <strong>AI助手:</strong>
+                                <p>${renderMarkdown(currentContent)}</p>
+                                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                            `;
+                            autoScroll();
+                            if (data.conversation_id && !currentConversationId) {
+                                currentConversationId = data.conversation_id;
+                                debounceUpdateSidebar();
+                            }
+                        } catch (e) {
+                            console.error('解析错误:', rawData, e);
+                            aiMsg.querySelector('p').textContent = '解析失败';
+                            showError('解析失败');
                             break;
-                        }
-                        currentContent += data.content || '';
-                        aiMsg.innerHTML = `<strong>AI助手:</strong><p>${renderMarkdown(currentContent)}</p><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
-                        autoScroll();
-                        if (data.conversation_id && !currentConversationId) {
-                            currentConversationId = data.conversation_id;
-                            await updateSidebar();
                         }
                     }
                     buffer = lines[lines.length - 1];
                 }
             } catch (error) {
+                console.error('请求错误:', error);
                 aiMsg.querySelector('p').textContent = '请求失败，请重试';
-                errorMessage.textContent = '请求失败，请重试';
-                errorMessage.style.display = 'block';
+                showError('请求失败，请重试');
             } finally {
                 sendBtn.disabled = false;
                 sendBtn.textContent = '发送';
+                autoScroll();
             }
         }
 
         function renderMarkdown(text) {
-            return DOMPurify.sanitize(marked.parse(text));
+            const rawHtml = marked.parse(text);
+            return DOMPurify.sanitize(rawHtml);
         }
 
         function clearChat() {
             chatBox.innerHTML = '';
             document.getElementById('user-input').value = '';
-            errorMessage.style.display = 'none';
+            hideError();
+            autoScroll();
         }
 
         function startNewConversation() {
             currentConversationId = null;
             chatBox.innerHTML = '';
-            errorMessage.style.display = 'none';
-            updateSidebar();
+            hideError();
+            debounceUpdateSidebar();
         }
 
-        async function updateSidebar() {
+        function debounceUpdateSidebar() {
+            const now = Date.now();
+            if (now - lastSidebarUpdate > sidebarUpdateDebounce) {
+                lastSidebarUpdate = now;
+                updateSidebar();
+            } else {
+                setTimeout(debounceUpdateSidebar, sidebarUpdateDebounce);
+            }
+        }
+
+        function updateSidebar() {
             const conversationList = document.getElementById('conversation-list');
-            const response = await fetch('/chat/conversations/', { headers: { 'X-CSRFToken': getCookie('csrftoken') } });
-            const data = await response.json();
-            conversationList.innerHTML = '';
-            data.conversations.forEach(conv => {
-                const li = document.createElement('li');
-                li.dataset.conversationId = conv.id;
-                if (conv.id === currentConversationId) li.className = 'active';
-                li.innerHTML = `<span class="title">${DOMPurify.sanitize(conv.title)}</span><button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>`;
-                li.querySelector('.title').onclick = () => window.location.href = `/stream_chat/${conv.id}/`;
-                conversationList.appendChild(li);
-            });
+            fetch('/chat/conversations/', {
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch conversations');
+                    return response.json();
+                })
+                .then(data => {
+                    conversationList.innerHTML = '';
+                    data.conversations.forEach(conv => {
+                        if (!document.querySelector(`li[data-conversation-id="${conv.id}"]`)) {
+                            const li = document.createElement('li');
+                            li.dataset.conversationId = conv.id;
+                            if (conv.id === currentConversationId) {
+                                li.className = 'active';
+                            }
+                            li.innerHTML = `
+                                <span class="title">${DOMPurify.sanitize(conv.title)}</span>
+                                <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
+                            `;
+                            li.querySelector('.title').onclick = () => {
+                                window.location.href = `/stream_chat/${conv.id}/`;
+                            };
+                            conversationList.appendChild(li);
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.error('侧边栏更新错误:', err);
+                    showError('无法加载对话列表');
+                });
         }
 
-        async function deleteConversation(conversationId) {
+        function deleteConversation(conversationId) {
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) {
-                errorMessage.textContent = '无法获取 CSRF token，请刷新页面';
-                errorMessage.style.display = 'block';
+                showError('无法获取 CSRF token，请刷新页面');
                 return;
             }
 
-            const response = await fetch(`/chat/delete/${conversationId}/`, {
+            fetch(`/chat/delete/${conversationId}/`, {
                 method: 'POST',
-                headers: { 'X-CSRFToken': csrftoken }
-            });
-            const data = await response.json();
-            if (data.success) {
-                if (conversationId === currentConversationId) startNewConversation();
-                else updateSidebar();
-            } else {
-                errorMessage.textContent = '删除对话失败，请重试';
-                errorMessage.style.display = 'block';
-            }
+                headers: {
+                    'X-CSRFToken': csrftoken
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        if (conversationId === currentConversationId) {
+                            startNewConversation();
+                        } else {
+                            debounceUpdateSidebar();
+                        }
+                    } else {
+                        throw new Error(data.error || '删除失败');
+                    }
+                })
+                .catch(err => {
+                    console.error('删除对话错误:', err);
+                    showError('删除对话失败，请重试');
+                });
         }
-
-        chatBox.addEventListener('scroll', () => {
-            isUserScrolling = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight > 100;
-        });
     </script>
 </body>
 </html>
