@@ -93,23 +93,19 @@ def stream_chat(request):
         model = body.get('model', 'v3')
         conversation_id = body.get('conversation_id')
 
+        logger.info(f"Received conversation_id: {conversation_id}")
+
         # Validate or generate conversation_id
         if not conversation_id:
             conversation_id = str(uuid.uuid4())
+            logger.info(f"Generated new conversation_id: {conversation_id}")
         else:
             try:
-                # Ensure it's a valid UUID
                 uuid.UUID(conversation_id)
             except ValueError:
                 logger.warning(f"Invalid conversation_id received: {conversation_id}")
                 conversation_id = str(uuid.uuid4())
-
-        if not question:
-            logger.warning("Empty question received")
-            return StreamingHttpResponse(
-                iter([f"data: {json.dumps({'error': '问题不能为空'})}\n\n"]),
-                content_type="text/event-stream"
-            )
+                logger.info(f"Generated new conversation_id: {conversation_id}")
 
         ChatMessage.objects.create(
             user=request.user,
