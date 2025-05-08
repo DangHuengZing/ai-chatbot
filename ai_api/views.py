@@ -91,15 +91,20 @@ def stream_chat(request):
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
     try:
-        body = json.loads(request.body)
+        body = json.loads(request.body.decode('utf-8'))
+        logger.info(f"Raw request body: {request.body.decode('utf-8')}")
         question = body.get('question', '')
         model = body.get('model', 'v3')
-        logger.info(f"Request body: {body}")
-        logger.info(f"Received model: {model}")
+        logger.info(f"Extracted model from body: {model}")
+        if model not in ['v3', 'r1']:
+            logger.warning(f"Invalid model value received: {model}, defaulting to v3")
+            model = 'v3'
+        logger.info(f"Final model after validation: {model}")
         conversation_id = body.get('conversation_id', None)
 
         if not conversation_id or conversation_id.strip() == '':
             conversation_id = str(uuid.uuid4())
+            logger.info(f"Generated new conversation_id: {conversation_id}")
 
         if not question:
             logger.warning("Empty question received")
@@ -168,13 +173,20 @@ def stream_chat(request):
         }
         logger.info(f"Sending payload to DeepSeek: {payload}")
 
-        response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            stream=True,
-            timeout=60
-        )
+        try:
+            response = requests.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                stream=True,
+                timeout=60
+            )
+        except Exception as e:
+            logger.error(f"DeepSeek API request failed: {e}")
+            return StreamingHttpResponse(
+                iter([f"data: {json.dumps({'error': f'API request failed: {str(e)}'})}\n\n"]),
+                content_type="text/event-stream"
+            )
 
         if response.status_code != 200:
             logger.error(f"DeepSeek API error {response.status_code}: {response.text}")
@@ -184,7 +196,9 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
+        first_chunk = True
         def event_stream():
+            nonlocal first_chunk
             full_content = ''
             chunk_received = False
             try:
@@ -214,11 +228,15 @@ def stream_chat(request):
                     try:
                         parsed = json.loads(raw_data)
                         delta = parsed['choices'][0]['delta'].get('content', '')
+                        if first_chunk:
+                            model_used = parsed.get('model', api_model)
+                            logger.info(f"Model reported by DeepSeek API: {model_used}")
+                            first_chunk = False
                         if delta:
                             chunk_received = True
                             full_content += delta
                             logger.info(f"Streaming chunk: {delta}")
-                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id, 'model': api_model})}\n\n"
+                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id, 'model': model_used})}\n\n"
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
