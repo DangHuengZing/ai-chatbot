@@ -212,7 +212,7 @@
             <ul id="conversation-list">
                 {% for conv in conversations %}
                     <li data-conversation-id="{{ conv.id }}" {% if conv.id == current_conversation_id %}class="active"{% endif %}>
-                        <span class="title">{{ conv.title|safe }}</span>
+                        <span class="title">{{ conv.title }}</span>
                         <button class="delete-btn" onclick="deleteConversation('{{ conv.id }}')">删除</button>
                     </li>
                 {% endfor %}
@@ -229,11 +229,9 @@
                 <div id="chat-box">
                     {% for message in chat_history %}
                         <div class="message {{ message.role }}-message">
-                            <strong>{% if message.role == 'user' %}您{% else %}AI助手{% endif %}:</strong>
+                            <strong>{{ message.role|capfirst }} (模型: {{ message.model_type }}):</strong>
                             <p>{{ message.content|safe }}</p>
                             <div class="message-timestamp">{{ message.timestamp|date:"Y-m-d H:i" }}</div>
-                            <!-- Debug: Log the role -->
-                            <script>console.log('Chat history message role:', '{{ message.role }}');</script>
                         </div>
                     {% endfor %}
                 </div>
@@ -449,7 +447,7 @@
                         } catch (e) {
                             console.error('解析错误:', rawData, e);
                             contentP.textContent = '解析失败';
-                            errorMessage.textContent = '解析失败：' + e.message;
+                            errorMessage.textContent = '解析失败';
                             errorMessage.style.display = 'block';
                             hasError = true;
                             break;
