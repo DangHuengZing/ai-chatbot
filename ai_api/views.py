@@ -2,6 +2,7 @@ import json
 import logging
 import requests
 import uuid
+import sys
 from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse, StreamingHttpResponse
@@ -237,6 +238,7 @@ def stream_chat(request):
                             full_content += delta
                             logger.info(f"Streaming chunk: {delta}")
                             yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id, 'model': model_used})}\n\n"
+                            sys.stdout.flush()
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
