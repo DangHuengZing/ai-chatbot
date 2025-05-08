@@ -2,7 +2,6 @@ import json
 import logging
 import requests
 import uuid
-import sys
 from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse, StreamingHttpResponse
@@ -65,16 +64,13 @@ def stream_chat_page(request, conversation_id=None):
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
-        first_user_message = ChatMessage.objects.filter(
-            user=request.user,
-            conversation_id=conv['conversation_id'],
-            role='user'
+        first_message = ChatMessage.objects.filter(
+            user=request.user, conversation_id=conv['conversation_id']
         ).order_by('timestamp').first()
-        if first_user_message:
-            conversation_list.append({
-                'id': str(conv['conversation_id']),
-                'title': first_user_message.title
-            })
+        conversation_list.append({
+            'id': str(conv['conversation_id']),
+            'title': first_message.title if first_message else '未命名对话'
+        })
 
     return render(request, 'ai_api/stream_chat.html', {
         'username': request.user.username,
@@ -92,20 +88,10 @@ def stream_chat(request):
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
 
     try:
-        body = json.loads(request.body.decode('utf-8'))
-        logger.info(f"Raw request body: {request.body.decode('utf-8')}")
+        body = json.loads(request.body)
         question = body.get('question', '')
         model = body.get('model', 'v3')
-        logger.info(f"Extracted model from body: {model}")
-        if model not in ['v3', 'r1']:
-            logger.warning(f"Invalid model value received: {model}, defaulting to v3")
-            model = 'v3'
-        logger.info(f"Final model after validation: {model}")
-        conversation_id = body.get('conversation_id', None)
-
-        if not conversation_id or conversation_id.strip() == '':
-            conversation_id = str(uuid.uuid4())
-            logger.info(f"Generated new conversation_id: {conversation_id}")
+        conversation_id = body.get('conversation_id', str(uuid.uuid4()))
 
         if not question:
             logger.warning("Empty question received")
@@ -133,36 +119,11 @@ def stream_chat(request):
         history = ChatMessage.objects.filter(
             user=request.user, conversation_id=conversation_id
         ).order_by('timestamp').values('role', 'content')[:10]
+        messages = [{'role': msg['role'], 'content': msg['content']} for msg in history]
+        messages.append({'role': 'user', 'content': question})
 
-        merged_messages = []
-        last_role = None
-        last_content = ""
-
-        for msg in history:
-            role = 'assistant' if msg['role'] == 'ai' else msg['role']
-            content = msg['content']
-
-            if role == last_role:
-                last_content += "\n" + content
-            else:
-                if last_role is not None:
-                    merged_messages.append({'role': last_role, 'content': last_content})
-                last_role = role
-                last_content = content
-
-        if last_role is not None:
-            merged_messages.append({'role': last_role, 'content': last_content})
-
-        if merged_messages and merged_messages[-1]['role'] == 'user':
-            merged_messages[-1]['content'] += "\n" + question
-        else:
-            merged_messages.append({'role': 'user', 'content': question})
-
-        messages = merged_messages
-        logger.info(f"Merged messages for DeepSeek API: {messages}")
-
-        api_model = "deepseek-chat" if model == "v3" else "deepseek-reasoner"
-        logger.info(f"Using API model: {api_model}")
+        # Align with MODEL_CHOICES labels
+        api_model = "deepseek-chat" if model == "v3" else "deepseek-coder"  # Fixed mapping
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json'
@@ -172,22 +133,14 @@ def stream_chat(request):
             'messages': messages,
             'stream': True
         }
-        logger.info(f"Sending payload to DeepSeek: {payload}")
 
-        try:
-            response = requests.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers=headers,
-                json=payload,
-                stream=True,
-                timeout=60
-            )
-        except Exception as e:
-            logger.error(f"DeepSeek API request failed: {e}")
-            return StreamingHttpResponse(
-                iter([f"data: {json.dumps({'error': f'API request failed: {str(e)}'})}\n\n"]),
-                content_type="text/event-stream"
-            )
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            stream=True,
+            timeout=60
+        )
 
         if response.status_code != 200:
             logger.error(f"DeepSeek API error {response.status_code}: {response.text}")
@@ -197,11 +150,8 @@ def stream_chat(request):
                 content_type="text/event-stream"
             )
 
-        first_chunk = True
         def event_stream():
-            nonlocal first_chunk
             full_content = ''
-            chunk_received = False
             try:
                 for line in response.iter_lines(decode_unicode=True):
                     if not line:
@@ -210,7 +160,6 @@ def stream_chat(request):
                     if not line.startswith("data: "):
                         continue
                     raw_data = line.removeprefix("data: ").strip()
-                    logger.info(f"Received raw data from DeepSeek: {raw_data}")
                     if raw_data == '[DONE]':
                         if full_content:
                             ChatMessage.objects.create(
@@ -221,24 +170,14 @@ def stream_chat(request):
                                 content=full_content,
                                 is_stream=True
                             )
-                        else:
-                            logger.warning("No content received from DeepSeek API")
-                            yield f"data: {json.dumps({'error': 'No response content received from DeepSeek API'})}\n\n"
                         yield 'data: [DONE]\n\n'
                         break
                     try:
                         parsed = json.loads(raw_data)
                         delta = parsed['choices'][0]['delta'].get('content', '')
-                        if first_chunk:
-                            model_used = parsed.get('model', api_model)
-                            logger.info(f"Model reported by DeepSeek API: {model_used}")
-                            first_chunk = False
                         if delta:
-                            chunk_received = True
                             full_content += delta
-                            logger.info(f"Streaming chunk: {delta}")
-                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id, 'model': model_used})}\n\n"
-                            sys.stdout.flush()
+                            yield f"data: {json.dumps({'content': delta, 'conversation_id': conversation_id})}\n\n"
                     except json.JSONDecodeError as e:
                         logger.warning(f"Failed to parse JSON: {raw_data}, Error: {e}")
                         yield f"data: {json.dumps({'error': 'Invalid JSON received'})}\n\n"
@@ -247,9 +186,6 @@ def stream_chat(request):
                 logger.error(f"Stream error: {e}")
                 yield f"data: {json.dumps({'error': 'Stream error occurred'})}\n\n"
             finally:
-                if not chunk_received:
-                    logger.warning("No chunks received from DeepSeek API")
-                    yield f"data: {json.dumps({'error': 'No response chunks received from DeepSeek API'})}\n\n"
                 response.close()
 
         return StreamingHttpResponse(event_stream(), content_type="text/event-stream")
@@ -273,17 +209,13 @@ def get_conversations(request):
     conversations = ChatMessage.objects.filter(user=request.user).values('conversation_id').distinct()
     conversation_list = []
     for conv in conversations:
-        first_user_message = ChatMessage.objects.filter(
-            user=request.user,
-            conversation_id=conv['conversation_id'],
-            role='user'
+        first_message = ChatMessage.objects.filter(
+            user=request.user, conversation_id=conv['conversation_id']
         ).order_by('timestamp').first()
-        if first_user_message:
-            conversation_list.append({
-                'id': str(conv['conversation_id']),
-                'title': first_user_message.title
-            })
-    logger.info(f"User {request.user.username} fetched {len(conversation_list)} conversations: {conversation_list}")
+        conversation_list.append({
+            'id': str(conv['conversation_id']),
+            'title': first_message.title if first_message else '未命名对话'
+        })
     return JsonResponse({'conversations': conversation_list})
 
 @login_required
