@@ -232,6 +232,8 @@
                             <strong>{% if message.role == 'user' %}您{% else %}AI助手{% endif %}:</strong>
                             <p>{{ message.content|safe }}</p>
                             <div class="message-timestamp">{{ message.timestamp|date:"Y-m-d H:i" }}</div>
+                            <!-- Debug: Log the role -->
+                            <script>console.log('Chat history message role:', '{{ message.role }}');</script>
                         </div>
                     {% endfor %}
                 </div>
