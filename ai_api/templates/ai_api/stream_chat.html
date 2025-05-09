@@ -416,34 +416,8 @@
                                 break;
                             }
                             currentContent += data.content || '';
-                            // 正确方式：仅更新内容区域
-                            while (true) {
-                                // ...原有读取流逻辑...
-
-                                // 修改事件处理部分：
-                                events.slice(0,-1).forEach(event => {
-                                    if (!event.startsWith('data:')) return;
-                                    const rawData = event.repalce('data:','').trim();
-                                    if (rawData === '[DONE]') return;
-
-                                    try {
-                                        const data = JSON.parse(rawData);
-                                        if (data.error) {
-                                            messageContent.textContent = data.error; // 仅更新内容区域
-                                            return;
-                                        }
-                                        currentContent += data.content || '';
-                                        messageContent.innerHTML = renderMarkdown(currentContent); // 关键修改点
-                                        autoScroll();
-                                    } catch(e) { console.error('解析错误:',e); }
-                                });
-                                buffer = events[events.length -1] || '';
-                            }
+                            messageContent.innerHTML = renderMarkdown(currentContent); // 更新内容
                             autoScroll();
-                            if (data.conversation_id && !currentConversationId) {
-                                currentConversationId = data.conversation_id;
-                                debounceUpdateSidebar();
-                            }
                         } catch (e) {
                             console.error('解析错误:', rawData, e);
                             aiMsg.querySelector('p').textContent = '解析失败';
@@ -508,13 +482,12 @@
                     const li = document.createElement('li');
                     li.dataset.conversationId = conv.id;
                     if (conv.id === currentConversationId) li.className = 'active';
-                    li.innerHTML = '
-                        <span class="title">${DOMPurifi.sanitize(conv.title)}</span>
-                        <button class="delete-btn" onclick="deleteConversation('$
-        {conv.id}')">删除</button>
-                    ';
+                    li.innerHTML = `
+                        <span class="title">${DOMPurify.sanitize(conv.title)}</span>
+                        <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
+                    `;
                     li.querySelector('.title').onclick = () => {
-                        window.location.href = '/stream_chat/${conv.id}/';
+                        window.location.href = `/stream_chat/${conv.id}/`;
                     };
                     conversationList.appendChild(li);//直接添加新项
                 });
