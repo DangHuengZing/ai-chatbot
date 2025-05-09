@@ -360,9 +360,11 @@
             aiMsg.className = 'message ai-message';
             aiMsg.innerHTML = `
                 <strong>AI助手:</strong>
-                <p>思考中...</p>
-                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-            `;
+                <div class="message-content"></div> <!-- 独立内容容器 -->
+                <div class="message-timestamp">...</div>
+            ';
+            const messageContent = aiMsg.querySelector('.message-content'); // 获取内容容器
+            messageContent.textContent = '思考中...'; // 初始化内容
             chatBox.appendChild(aiMsg);
             autoScroll();
 
@@ -414,11 +416,29 @@
                                 break;
                             }
                             currentContent += data.content || '';
-                            aiMsg.innerHTML = `
-                                <strong>AI助手:</strong>
-                                <p>${renderMarkdown(currentContent)}</p>
-                                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-                            `;
+                            // 正确方式：仅更新内容区域
+                            while (true) {
+                                // ...原有读取流逻辑...
+
+                                // 修改事件处理部分：
+                                events.slice(0,-1).forEach(event => {
+                                    if (!event.startsWith('data:')) return;
+                                    const rawData = event.repalce('data:','').trim();
+                                    if (rawData === '[DONE]') return;
+
+                                    try {
+                                        const data = JSON.parse(rawData);
+                                        if (data.error) {
+                                            messageContent.textContent = data.error; // 仅更新内容区域
+                                            return;
+                                        }
+                                        currentContent += data.content || '';
+                                        messageContent.innerHTML = renderMarkdown(currentContent); // 关键修改点
+                                        autoScroll();
+                                    } catch(e) { console.error('解析错误:',e); }
+                                });
+                                buffer = events[events.length -1] || '';
+                            }
                             autoScroll();
                             if (data.conversation_id && !currentConversationId) {
                                 currentConversationId = data.conversation_id;
@@ -476,38 +496,30 @@
         function updateSidebar() {
             const conversationList = document.getElementById('conversation-list');
             fetch('/chat/conversations/', {
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
+                headers: {'X-CSRFToken': getCookie('csrftoken')}
             })
-                .then(response => {
-                    if (!response.ok) throw new Error('Failed to fetch conversations');
-                    return response.json();
-                })
-                .then(data => {
-                    conversationList.innerHTML = '';
-                    data.conversations.forEach(conv => {
-                        if (!document.querySelector(`li[data-conversation-id="${conv.id}"]`)) {
-                            const li = document.createElement('li');
-                            li.dataset.conversationId = conv.id;
-                            if (conv.id === currentConversationId) {
-                                li.className = 'active';
-                            }
-                            li.innerHTML = `
-                                <span class="title">${DOMPurify.sanitize(conv.title)}</span>
-                                <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
-                            `;
-                            li.querySelector('.title').onclick = () => {
-                                window.location.href = `/stream_chat/${conv.id}/`;
-                            };
-                            conversationList.appendChild(li);
-                        }
-                    });
-                })
-                .catch(err => {
-                    console.error('侧边栏更新错误:', err);
-                    showError('无法加载对话列表');
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to fetch conversations');
+                return response.json();
+            })
+            .then(data => {
+                conversationList.innerHTML = ''; //先清空整个列表
+                data.conversations.forEach(conv => {
+                    const li = document.createElement('li');
+                    li.dataset.conversationId = conv.id;
+                    if (conv.id === currentConversationId) li.className = 'active';
+                    li.innerHTML = '
+                        <span class="title">${DOMPurifi.sanitize(conv.title)}</span>
+                        <button class="delete-btn" onclick="deleteConversation('$
+        {conv.id}')">删除</button>
+                    ';
+                    li.querySelector('.title').onclick = () => {
+                        window.location.href = '/stream_chat/${conv.id}/';
+                    };
+                    conversationList.appendChild(li);//直接添加新项
                 });
+            })
+            .catch(err => console.error('侧边栏更新错误：', err));
         }
 
         function deleteConversation(conversationId) {
