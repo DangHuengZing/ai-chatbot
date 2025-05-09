@@ -240,20 +240,10 @@
         let lastSidebarUpdate = 0;
         const sidebarUpdateDebounce = 1000; // 1 second debounce
 
-        // Normalize currentConversationId
         if (currentConversationId === '') {
             currentConversationId = null;
         }
 
-        // Initialize Markdown rendering for historical messages
-        document.querySelectorAll('.message').forEach(messageElement => {
-            const rawContent = messageElement.getAttribute('data-content');
-            const contentElement = messageElement.querySelector('.message-content');
-            contentElement.innerHTML = renderMarkdown(rawContent);
-            autoScroll();
-        });
-
-        // Auto-scroll logic
         function autoScroll() {
             const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
             if (isNearBottom && !isUserScrolling) {
@@ -264,14 +254,12 @@
             }
         }
 
-        // Scroll to bottom manually
         function scrollToBottom() {
             chatBox.scrollTop = chatBox.scrollHeight;
             scrollToBottomBtn.style.display = 'none';
             isUserScrolling = false;
         }
 
-        // Detect user scrolling
         chatBox.addEventListener('scroll', () => {
             isUserScrolling = true;
             const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 100;
@@ -416,34 +404,8 @@
                                 break;
                             }
                             currentContent += data.content || '';
-                            // 正确方式：仅更新内容区域
-                            while (true) {
-                                // ...原有读取流逻辑...
-
-                                // 修改事件处理部分：
-                                events.slice(0,-1).forEach(event => {
-                                    if (!event.startsWith('data:')) return;
-                                    const rawData = event.repalce('data:','').trim();
-                                    if (rawData === '[DONE]') return;
-
-                                    try {
-                                        const data = JSON.parse(rawData);
-                                        if (data.error) {
-                                            messageContent.textContent = data.error; // 仅更新内容区域
-                                            return;
-                                        }
-                                        currentContent += data.content || '';
-                                        messageContent.innerHTML = renderMarkdown(currentContent); // 关键修改点
-                                        autoScroll();
-                                    } catch(e) { console.error('解析错误:',e); }
-                                });
-                                buffer = events[events.length -1] || '';
-                            }
+                            messageContent.innerHTML = renderMarkdown(currentContent); // 更新内容区域
                             autoScroll();
-                            if (data.conversation_id && !currentConversationId) {
-                                currentConversationId = data.conversation_id;
-                                debounceUpdateSidebar();
-                            }
                         } catch (e) {
                             console.error('解析错误:', rawData, e);
                             aiMsg.querySelector('p').textContent = '解析失败';
@@ -503,19 +465,19 @@
                 return response.json();
             })
             .then(data => {
-                conversationList.innerHTML = ''; //先清空整个列表
+                conversationList.innerHTML = ''; //清空整个列表
                 data.conversations.forEach(conv => {
                     const li = document.createElement('li');
                     li.dataset.conversationId = conv.id;
                     if (conv.id === currentConversationId) li.className = 'active';
                     li.innerHTML = `
-                        <span class="title">${DOMPurifi.sanitize(conv.title)}</span>
+                        <span class="title">${DOMPurify.sanitize(conv.title)}</span>
                         <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
                     `;
                     li.querySelector('.title').onclick = () => {
                         window.location.href = '/stream_chat/${conv.id}/';
                     };
-                    conversationList.appendChild(li);//直接添加新项
+                    conversationList.appendChild(li); //直接添加新项
                 });
             })
             .catch(err => console.error('侧边栏更新错误：', err));
