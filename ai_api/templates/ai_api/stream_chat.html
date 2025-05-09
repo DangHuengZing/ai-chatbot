@@ -362,7 +362,7 @@
                 <strong>AI助手:</strong>
                 <div class="message-content"></div> <!-- 独立内容容器 -->
                 <div class="message-timestamp">...</div>
-            ';
+            `;
             const messageContent = aiMsg.querySelector('.message-content'); // 获取内容容器
             messageContent.textContent = '思考中...'; // 初始化内容
             chatBox.appendChild(aiMsg);
@@ -508,11 +508,10 @@
                     const li = document.createElement('li');
                     li.dataset.conversationId = conv.id;
                     if (conv.id === currentConversationId) li.className = 'active';
-                    li.innerHTML = '
+                    li.innerHTML = `
                         <span class="title">${DOMPurifi.sanitize(conv.title)}</span>
-                        <button class="delete-btn" onclick="deleteConversation('$
-        {conv.id}')">删除</button>
-                    ';
+                        <button class="delete-btn" onclick="deleteConversation('${conv.id}')">删除</button>
+                    `;
                     li.querySelector('.title').onclick = () => {
                         window.location.href = '/stream_chat/${conv.id}/';
                     };
