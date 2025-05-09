@@ -94,7 +94,7 @@
             border-radius: 8px;
             margin-bottom: 1rem;
             scroll-behavior: smooth;
-            height: 100%; /* Ensuring it fills the available space */
+            height: calc(100vh - 200px); /* Adjust height to ensure scroll */
         }
         .message {
             margin: 1rem 0;
@@ -479,7 +479,7 @@
                 return response.json();
             })
             .then(data => {
-                conversationList.innerHTML = ''; //先清空整个列表
+                conversationList.innerHTML = ''; // 先清空整个列表
                 data.conversations.forEach(conv => {
                     const li = document.createElement('li');
                     li.dataset.conversationId = conv.id;
