@@ -8,9 +8,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
     <style>
         body {
-            background-color: #222;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            color: #fff;
+            background-color: #f5f5f5;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
             margin: 0;
             padding: 0;
             display: flex;
@@ -19,95 +19,77 @@
         }
         .container {
             display: flex;
+            flex-direction: column;
             width: 100%;
             max-width: 1400px;
             margin: 0 auto;
         }
         .sidebar {
-            width: 280px;
-            background: #333;
-            padding: 1.5rem;
-            border-right: 1px solid #444;
-            overflow-y: auto;
-            flex-shrink: 0;
-            height: 100%;
-        }
-        .sidebar h3 {
-            margin: 0 0 1rem;
-            color: #f4f4f4;
-            font-size: 1.2rem;
-        }
-        .sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        .sidebar li {
+            width: 100%;
+            background: #fff;
+            padding: 1rem;
+            border-bottom: 1px solid #ddd;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem;
-            cursor: pointer;
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-            transition: background 0.2s;
         }
-        .sidebar li:hover {
-            background: #444;
+        .sidebar h3 {
+            font-size: 1.2rem;
+            margin: 0;
         }
-        .sidebar li.active {
-            background: #28a745;
-        }
-        .sidebar .delete-btn {
-            background: #dc3545;
-            padding: 0.3rem 0.6rem;
-            font-size: 0.8rem;
+        .sidebar button {
+            background-color: #28a745;
+            color: white;
             border: none;
-            border-radius: 4px;
-            color: #fff;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
             cursor: pointer;
         }
-        .sidebar .delete-btn:hover {
-            background: #c82333;
+        .sidebar button:hover {
+            background-color: #218838;
         }
         .main {
             flex: 1;
             display: flex;
             flex-direction: column;
-            padding: 2rem;
+            padding: 1.5rem;
+            background-color: #f5f5f5;
             overflow: hidden;
         }
         #chat-container {
-            background: #333;
+            background: #fff;
             border-radius: 12px;
             padding: 1.5rem;
-            flex: 1;
             display: flex;
             flex-direction: column;
             position: relative;
+            height: 100%;
+            overflow: hidden;
         }
         #chat-box {
             flex: 1;
             overflow-y: auto;
             padding: 1.5rem;
-            background: #444;
+            background: #f0f0f0;
             border-radius: 8px;
             margin-bottom: 1rem;
             scroll-behavior: smooth;
-            height: calc(100vh - 200px); /* Adjust height to ensure scroll */
+            max-height: calc(100vh - 150px);
         }
         .message {
             margin: 1rem 0;
             padding: 1rem;
             border-radius: 8px;
-            background: #555;
+            background: #d1e7dd;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         .user-message {
+            background: #d1e7dd;
             border-left: 4px solid #4299e1;
         }
         .ai-message {
-            border-left: 4px solid #28a745;
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
         }
         .message-timestamp {
             font-size: 0.8rem;
@@ -134,47 +116,27 @@
         textarea {
             width: 100%;
             padding: 0.8rem;
-            border: 2px solid #444;
+            border: 2px solid #ddd;
             border-radius: 8px;
             margin-bottom: 1rem;
-            background-color: #444;
-            color: #fff;
+            background-color: #fff;
+            color: #333;
             resize: vertical;
             min-height: 80px;
         }
         .model-selector {
             padding: 0.5rem;
-            border: 2px solid #444;
+            border: 2px solid #ddd;
             border-radius: 6px;
             margin-bottom: 1rem;
-            background-color: #444;
-            color: #fff;
+            background-color: #fff;
+            color: #333;
             width: 200px;
-        }
-        #error-message {
-            color: #dc3545;
-            display: none;
-            padding: 10px;
-            border: 1px solid #dc3545;
-            background-color: #ffcccb;
-            margin-bottom: 15px;
-            border-radius: 6px;
-            position: relative;
-        }
-        #error-message .close-btn {
-            position: absolute;
-            top: 5px;
-            right: 10px;
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-size: 1rem;
-            cursor: pointer;
         }
         #scroll-to-bottom {
             position: absolute;
-            bottom: 150px;
-            right: 30px;
+            bottom: 10px;
+            right: 20px;
             background: #28a745;
             padding: 0.5rem;
             border-radius: 50%;
@@ -187,7 +149,6 @@
             }
             .sidebar {
                 width: 100%;
-                max-height: 200px;
             }
             .main {
                 padding: 1rem;
@@ -199,9 +160,6 @@
     <div class="container">
         <div class="sidebar">
             <h3>对话历史</h3>
-            <ul id="conversation-list">
-                <!-- 对话列表将动态加载 -->
-            </ul>
             <button onclick="startNewConversation()">新建对话</button>
         </div>
         <div class="main">
@@ -479,7 +437,7 @@
                 return response.json();
             })
             .then(data => {
-                conversationList.innerHTML = ''; // 先清空整个列表
+                conversationList.innerHTML = ''; //先清空整个列表
                 data.conversations.forEach(conv => {
                     const li = document.createElement('li');
                     li.dataset.conversationId = conv.id;
