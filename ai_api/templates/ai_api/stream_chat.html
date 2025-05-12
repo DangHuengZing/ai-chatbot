@@ -13,392 +13,66 @@
             --sidebar-text-color: #ececf1;
             --sidebar-hover-bg: #343541;
             --chat-bg: #ffffff;
-            --user-msg-bg: #d1e7dd; /* 保持原有用户消息颜色 */
-            --ai-msg-bg: #f8d7da;   /* 保持原有AI消息颜色 */
+            --user-msg-bg: #d1e7dd;
+            --ai-msg-bg: #f8d7da;
             --text-color: #333;
             --border-color: #e0e0e0;
-            --primary-accent: #10a37f; /* 类似ChatGPT的绿色 */
+            --primary-accent: #10a37f;
             --button-text-color: #ffffff;
             --input-bg: #ffffff;
             --input-border-color: #ccc;
             --error-bg: #ffebee;
             --error-text: #c62828;
         }
-
-        body {
-            background-color: var(--bg-color);
-            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-            color: var(--text-color);
-            margin: 0;
-            padding: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        .container {
-            display: flex;
-            width: 100%;
-            height: 100%;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: 260px;
-            background: var(--sidebar-bg);
-            color: var(--sidebar-text-color);
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #3a3a3c; /* slightly lighter border */
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-        }
-
-        .sidebar-header {
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #3a3a3c;
-            margin-bottom: 1rem;
-        }
-
-        .sidebar-header h3 {
-            font-size: 1.1rem;
-            margin: 0 0 0.8rem 0;
-            text-align: center;
-        }
-
-        .sidebar .new-chat-btn {
-            background-color: var(--primary-accent);
-            color: var(--button-text-color);
-            border: none;
-            padding: 0.75rem;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            font-size: 0.9rem;
-            transition: background-color 0.2s;
-            margin-bottom: 1rem;
-        }
-
-        .sidebar .new-chat-btn:hover {
-            background-color: #0e8e6d;
-        }
-
-        #conversation-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-
-        #conversation-list li {
-            padding: 0.7rem 0.5rem;
-            margin-bottom: 0.5rem;
-            border-radius: 5px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background-color 0.2s;
-        }
-
+        body { background-color: var(--bg-color); font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--text-color); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
+        .container { display: flex; width: 100%; height: 100%; }
+        .sidebar { width: 260px; background: var(--sidebar-bg); color: var(--sidebar-text-color); padding: 1rem; display: flex; flex-direction: column; border-right: 1px solid #3a3a3c; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
+        .sidebar-header { padding-bottom: 1rem; border-bottom: 1px solid #3a3a3c; margin-bottom: 1rem; }
+        .sidebar-header h3 { font-size: 1.1rem; margin: 0 0 0.8rem 0; text-align: center; }
+        .sidebar .new-chat-btn { background-color: var(--primary-accent); color: var(--button-text-color); border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; width: 100%; font-size: 0.9rem; transition: background-color 0.2s; margin-bottom: 1rem; }
+        .sidebar .new-chat-btn:hover { background-color: #0e8e6d; }
+        #conversation-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        #conversation-list li { padding: 0.7rem 0.5rem; margin-bottom: 0.5rem; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.2s; }
         #conversation-list li:hover,
-        #conversation-list li.active {
-            background-color: var(--sidebar-hover-bg);
-        }
-
-        #conversation-list li .title {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            flex-grow: 1;
-            margin-right: 0.5rem;
-        }
-
-        #conversation-list li .delete-btn {
-            background: none;
-            border: none;
-            color: #aaa;
-            cursor: pointer;
-            padding: 0.3rem;
-            font-size: 0.8rem;
-        }
-        #conversation-list li .delete-btn:hover {
-            color: var(--sidebar-text-color);
-        }
-
-        .sidebar-footer {
-            padding-top: 1rem;
-            border-top: 1px solid #3a3a3c;
-            font-size: 0.85rem;
-        }
-        .sidebar-footer p {
-            margin: 0.3rem 0;
-        }
-        .sidebar-footer #logout-btn {
-            background: var(--sidebar-hover-bg);
-            color: var(--sidebar-text-color);
-            border: none;
-            padding: 0.5rem 0.8rem;
-            border-radius: 4px;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 0.5rem;
-        }
-        .sidebar-footer #logout-btn:hover {
-            background: #4a4b57;
-        }
-
-
-        /* Main Chat Area */
-        .main-chat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--chat-bg);
-            overflow: hidden; /* Important for layout */
-        }
-
-        .chat-header {
-            padding: 0.8rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: #fdfdfd;
-        }
-
-        .chat-header h1 {
-            font-size: 1.2rem;
-            margin: 0;
-            color: #444;
-        }
-        .chat-controls {
-            display: flex;
-            align-items: center;
-            gap: 0.8rem;
-        }
-
-        .model-selector {
-            padding: 0.5rem 0.8rem;
-            border: 1px solid var(--input-border-color);
-            border-radius: 6px;
-            background-color: var(--input-bg);
-            color: var(--text-color);
-            font-size: 0.9rem;
-        }
-
-        .clear-chat-btn {
-            background-color: #6c757d;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: background-color 0.2s;
-        }
-
-        .clear-chat-btn:hover {
-            background-color: #5a6268;
-        }
-
-        #error-message {
-            background-color: var(--error-bg);
-            color: var(--error-text);
-            padding: 0.8rem 1.2rem;
-            margin: 0.5rem 1.5rem;
-            border-radius: 6px;
-            display: none; /* Hidden by default */
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.9rem;
-        }
-
-        #error-message .close-btn {
-            background: none;
-            border: none;
-            color: var(--error-text);
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 0 0.5rem;
-        }
-
-
-        #chat-box {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1.5rem;
-            background: var(--bg-color);
-            scroll-behavior: smooth;
-            position: relative; /* For scroll-to-bottom button */
-        }
-
-        .message {
-            margin-bottom: 1.2rem;
-            padding: 0.8rem 1.2rem;
-            border-radius: 12px;
-            max-width: 80%;
-            line-height: 1.6;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        }
-        .message strong { /* User/AI label */
-            display: block;
-            font-weight: 600;
-            margin-bottom: 0.3rem;
-            font-size: 0.9rem;
-        }
-
-        .user-message {
-            background: var(--user-msg-bg);
-            color: #1f5c3b; /* Darker green text for better contrast */
-            margin-left: auto; /* Align to right */
-            border-bottom-right-radius: 0; /* Chat bubble effect */
-        }
-
-        .ai-message {
-            background: var(--ai-msg-bg);
-            color: #721c24; /* Darker red text */
-            margin-right: auto; /* Align to left */
-            border-bottom-left-radius: 0; /* Chat bubble effect */
-        }
-        /* Markdown specific styling inside AI messages */
-        .ai-message .message-content p:last-child {
-            margin-bottom: 0;
-        }
-        .ai-message .message-content pre {
-            background-color: #2d2d2d;
-            color: #f0f0f0;
-            padding: 0.8rem;
-            border-radius: 6px;
-            overflow-x: auto;
-            font-size: 0.85em;
-        }
-        .ai-message .message-content code {
-            background-color: #e9ecef;
-            color: #c7254e;
-            padding: 0.2em 0.4em;
-            border-radius: 3px;
-            font-size: 0.85em;
-        }
-        .ai-message .message-content pre code {
-            background-color: transparent;
-            color: inherit;
-            padding: 0;
-            border-radius: 0;
-        }
-         .ai-message .message-content ul, .ai-message .message-content ol {
-            padding-left: 1.5rem;
-        }
-
-
-        .message-timestamp {
-            font-size: 0.75rem;
-            color: #777;
-            margin-top: 0.6rem;
-            text-align: right;
-        }
+        #conversation-list li.active { background-color: var(--sidebar-hover-bg); }
+        #conversation-list li .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; margin-right: 0.5rem; }
+        #conversation-list li .delete-btn { background: none; border: none; color: #aaa; cursor: pointer; padding: 0.3rem; font-size: 0.8rem; }
+        #conversation-list li .delete-btn:hover { color: var(--sidebar-text-color); }
+        .sidebar-footer { padding-top: 1rem; border-top: 1px solid #3a3a3c; font-size: 0.85rem; }
+        .sidebar-footer p { margin: 0.3rem 0; }
+        .sidebar-footer #logout-btn { background: var(--sidebar-hover-bg); color: var(--sidebar-text-color); border: none; padding: 0.5rem 0.8rem; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 0.5rem; }
+        .sidebar-footer #logout-btn:hover { background: #4a4b57; }
+        .main-chat { flex: 1; display: flex; flex-direction: column; background-color: var(--chat-bg); overflow: hidden; }
+        .chat-header { padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: #fdfdfd; }
+        .chat-header h1 { font-size: 1.2rem; margin: 0; color: #444; }
+        .chat-controls { display: flex; align-items: center; gap: 0.8rem; }
+        .model-selector { padding: 0.5rem 0.8rem; border: 1px solid var(--input-border-color); border-radius: 6px; background-color: var(--input-bg); color: var(--text-color); font-size: 0.9rem; }
+        .clear-chat-btn { background-color: #6c757d; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background-color 0.2s; }
+        .clear-chat-btn:hover { background-color: #5a6268; }
+        #error-message { background-color: var(--error-bg); color: var(--error-text); padding: 0.8rem 1.2rem; margin: 0.5rem 1.5rem; border-radius: 6px; display: none; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+        #error-message .close-btn { background: none; border: none; color: var(--error-text); font-size: 1.2rem; cursor: pointer; padding: 0 0.5rem; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--bg-color); scroll-behavior: smooth; position: relative; }
+        .message { margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px; max-width: 80%; line-height: 1.6; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .message strong { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem; }
+        .user-message { background: var(--user-msg-bg); color: #1f5c3b; margin-left: auto; border-bottom-right-radius: 0; }
+        .ai-message { background: var(--ai-msg-bg); color: #721c24; margin-right: auto; border-bottom-left-radius: 0; }
+        .ai-message .message-content p:last-child { margin-bottom: 0; }
+        .ai-message .message-content pre { background-color: #2d2d2d; color: #f0f0f0; padding: 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85em; }
+        .ai-message .message-content code { background-color: #e9ecef; color: #c7254e; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.85em; }
+        .ai-message .message-content pre code { background-color: transparent; color: inherit; padding: 0; border-radius: 0; }
+        .ai-message .message-content ul, .ai-message .message-content ol { padding-left: 1.5rem; }
+        .message-timestamp { font-size: 0.75rem; color: #777; margin-top: 0.6rem; text-align: right; }
         .user-message .message-timestamp { color: #4a7c59; }
         .ai-message .message-timestamp { color: #a0525a; }
-
-
-        .input-area {
-            padding: 1rem 1.5rem;
-            border-top: 1px solid var(--border-color);
-            background-color: #f0f2f5; /* Slightly different background for input area */
-            display: flex;
-            align-items: flex-end; /* Align items to bottom for textarea growth */
-            gap: 0.8rem;
-        }
-
-        #user-input {
-            flex: 1;
-            padding: 0.8rem 1rem;
-            border: 1px solid var(--input-border-color);
-            border-radius: 8px;
-            resize: none; /* Allow vertical resize by JS if needed, or just height adjust */
-            min-height: 44px; /* approx 1 line */
-            max-height: 200px; /* Limit growth */
-            overflow-y: auto;
-            font-size: 1rem;
-            line-height: 1.5;
-            background-color: var(--input-bg);
-        }
-        #user-input:focus {
-            outline: none;
-            border-color: var(--primary-accent);
-            box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
-        }
-
-        #send-btn {
-            background: var(--primary-accent);
-            color: var(--button-text-color);
-            border: none;
-            padding: 0.7rem 1.5rem; /* Make button a bit taller */
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            transition: background-color 0.2s;
-            align-self: flex-end; /* Keep button at bottom */
-            height: 44px; /* Match min-height of textarea */
-        }
-
-        #send-btn:hover {
-            background-color: #0e8e6d;
-        }
-        #send-btn:disabled {
-            background-color: #a0a0a0;
-            cursor: not-allowed;
-        }
-
-
-        #scroll-to-bottom {
-            position: absolute;
-            bottom: 20px; /* Adjust based on input area height if it's overlapping */
-            right: 20px;
-            background: var(--primary-accent);
-            color: white;
-            border: none;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: none; /* Hidden by default */
-            cursor: pointer;
-            font-size: 1.2rem;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            z-index: 10;
-        }
-        #scroll-to-bottom:hover {
-            background-color: #0e8e6d;
-        }
-
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .sidebar {
-                /* Could be hidden by default and toggled */
-                width: 220px; /* Slightly narrower */
-            }
-            .main-chat {
-                /* Take full width if sidebar is hidden */
-            }
-            .chat-header h1 {
-                font-size: 1rem;
-            }
-            .model-selector, .clear-chat-btn {
-                padding: 0.4rem 0.8rem;
-                font-size: 0.8rem;
-            }
-            .message {
-                max-width: 90%;
-            }
-            .input-area {
-                padding: 0.8rem 1rem;
-            }
-            #user-input, #send-btn {
-                font-size: 0.9rem;
-            }
-        }
-
+        .input-area { padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background-color: #f0f2f5; display: flex; align-items: flex-end; gap: 0.8rem; }
+        #user-input { flex: 1; padding: 0.8rem 1rem; border: 1px solid var(--input-border-color); border-radius: 8px; resize: none; min-height: 44px; max-height: 200px; overflow-y: auto; font-size: 1rem; line-height: 1.5; background-color: var(--input-bg); }
+        #user-input:focus { outline: none; border-color: var(--primary-accent); box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2); }
+        #send-btn { background: var(--primary-accent); color: var(--button-text-color); border: none; padding: 0.7rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s; align-self: flex-end; height: 44px; }
+        #send-btn:hover { background-color: #0e8e6d; }
+        #send-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; }
+        #scroll-to-bottom { position: absolute; bottom: 20px; right: 20px; background: var(--primary-accent); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; display: none; cursor: pointer; font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+        #scroll-to-bottom:hover { background-color: #0e8e6d; }
+        @media (max-width: 768px) { .sidebar { width: 220px; } .chat-header h1 { font-size: 1rem; } .model-selector, .clear-chat-btn { padding: 0.4rem 0.8rem; font-size: 0.8rem; } .message { max-width: 90%; } .input-area { padding: 0.8rem 1rem; } #user-input, #send-btn { font-size: 0.9rem; } }
     </style>
 </head>
 <body>
@@ -408,14 +82,12 @@
                 <h3>对话历史</h3>
                 <button class="new-chat-btn" onclick="startNewConversation()">+ 新建对话</button>
             </div>
-            <ul id="conversation-list">
-                </ul>
+            <ul id="conversation-list"></ul>
             <div class="sidebar-footer">
                 <p>用户: {{ username }}</p>
                 <button id="logout-btn" onclick="logout()">登出</button>
             </div>
         </div>
-
         <div class="main-chat">
             <div class="chat-header">
                 <h1>HuengZing的助手</h1>
@@ -427,17 +99,13 @@
                     <button class="clear-chat-btn" onclick="clearChat()">清空聊天</button>
                 </div>
             </div>
-
             <div id="error-message">
                 <span></span>
                 <button class="close-btn" onclick="hideError()">×</button>
             </div>
-
             <div id="chat-box">
                 </div>
-
             <button id="scroll-to-bottom" title="滚动到底部" onclick="scrollToBottom()">↓</button>
-
             <div class="input-area">
                 <textarea id="user-input" placeholder="输入问题... (Shift+Enter 换行)" onkeydown="handleKeydown(event)" rows="1"></textarea>
                 <button id="send-btn" type="button" onclick="sendMessage()">发送</button>
@@ -446,7 +114,7 @@
     </div>
 
     <script>
-        let currentConversationId = '{{ current_conversation_id|default:"" }}';
+        let currentConversationId = '{{ current_conversation_id|default:""|escapejs }}'; // escapejs for safety
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
@@ -457,33 +125,31 @@
 
         let isUserScrolling = false;
         let lastSidebarUpdate = 0;
-        const sidebarUpdateDebounce = 1000; // 1 second debounce
+        const sidebarUpdateDebounce = 1000; 
 
-        if (currentConversationId === '') {
+        if (currentConversationId === '' || currentConversationId === 'None') { // Django might pass 'None' string
             currentConversationId = null;
         }
 
-        // Adjust textarea height dynamically
         userInput.addEventListener('input', () => {
-            userInput.style.height = 'auto'; // Reset height
+            userInput.style.height = 'auto'; 
             let newHeight = userInput.scrollHeight;
-            const maxHeight = 200; // From CSS max-height
+            const maxHeight = 200; 
             if (newHeight > maxHeight) {
                 newHeight = maxHeight;
-                userInput.style.overflowY = 'auto'; // Show scrollbar if content exceeds max height
+                userInput.style.overflowY = 'auto'; 
             } else {
-                userInput.style.overflowY = 'hidden'; // Hide scrollbar if content is less than max height
+                userInput.style.overflowY = 'hidden'; 
             }
             userInput.style.height = `${newHeight}px`;
         });
 
-
         function autoScroll() {
-            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150; // Increased threshold
+            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150; 
             if (isNearBottom && !isUserScrolling) {
                 chatBox.scrollTop = chatBox.scrollHeight;
                 scrollToBottomBtn.style.display = 'none';
-            } else if (!isNearBottom && chatBox.scrollHeight > chatBox.clientHeight) {
+            } else if (!isNearBottom && chatBox.scrollHeight > chatBox.clientHeight + 50) { // Only show if significant scroll needed
                 scrollToBottomBtn.style.display = 'block';
             } else {
                 scrollToBottomBtn.style.display = 'none';
@@ -500,15 +166,8 @@
         chatBox.addEventListener('scroll', () => {
             isUserScrolling = true;
             clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => {
-                isUserScrolling = false; // Reset after a period of no scrolling
-            }, 200); // If user stops scrolling for 200ms, consider not actively scrolling
-
-            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
-            scrollToBottomBtn.style.display = isNearBottom ? 'none' : 'block';
-            if (isNearBottom) {
-                isUserScrolling = false; // If scrolled to bottom, reset flag
-            }
+            scrollTimeout = setTimeout(() => { isUserScrolling = false; }, 300); 
+            autoScroll(); // Update button visibility on scroll
         });
 
         function getCookie(name) {
@@ -526,114 +185,62 @@
             return cookieValue;
         }
 
-        function hideError() {
-            errorMessageContainer.style.display = 'none';
-            errorMessageText.textContent = '';
-        }
-
-        function showError(message) {
-            errorMessageText.textContent = message;
-            errorMessageContainer.style.display = 'flex'; // Use flex to align items
-            setTimeout(hideError, 5000);
-        }
+        function hideError() { errorMessageContainer.style.display = 'none'; errorMessageText.textContent = ''; }
+        function showError(message) { errorMessageText.textContent = message; errorMessageContainer.style.display = 'flex'; setTimeout(hideError, 7000); } // Longer display for errors
 
         function logout() {
             const logoutBtn = document.getElementById('logout-btn');
-            logoutBtn.disabled = true;
-            logoutBtn.textContent = '登出中...';
-            fetch('/logout/', { method: 'GET' })
+            logoutBtn.disabled = true; logoutBtn.textContent = '登出中...';
+            fetch("{% url 'ai_api:logout' %}", { method: 'GET' }) // Use Django URL template tag
                 .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.href = '/login/';
-                    } else {
-                         showError(data.error || '登出失败，请重试');
-                    }
-                })
-                .catch(err => {
-                    console.error('登出错误:', err);
-                    showError('登出失败，请重试');
-                })
-                .finally(() => {
-                    logoutBtn.disabled = false;
-                    logoutBtn.textContent = '登出';
-                });
+                .then(data => { if (data.success) { window.location.href = "{% url 'ai_api:login' %}"; } else { showError(data.error || '登出失败'); } })
+                .catch(err => { console.error('登出错误:', err); showError('登出通讯失败'); })
+                .finally(() => { logoutBtn.disabled = false; logoutBtn.textContent = '登出'; });
         }
 
-        function handleKeydown(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
-            }
-        }
+        function handleKeydown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }
 
         async function sendMessage() {
             const question = userInput.value.trim();
             const model = document.getElementById('model-select').value;
             if (!question) return;
 
-            sendBtn.disabled = true;
-            sendBtn.textContent = '思考中';
-            userInput.value = '';
-            userInput.style.height = 'auto'; // Reset height
+            sendBtn.disabled = true; sendBtn.textContent = '思考中';
+            userInput.value = ''; userInput.style.height = 'auto';
             hideError();
 
             const userMsgDiv = document.createElement('div');
             userMsgDiv.className = 'message user-message';
-            // Sanitize question for display as HTML (though typically not an issue here, good practice)
-            const sanitizedQuestion = DOMPurify.sanitize(question, {USE_PROFILES: {html: true}});
-            userMsgDiv.innerHTML = `
-                <strong>您:</strong>
-                <div class="message-content">${sanitizedQuestion.replace(/\n/g, '<br>')}</div>
-                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-            `;
+            const sanitizedQuestion = DOMPurify.sanitize(question, { USE_PROFILES: { html: true } });
+            userMsgDiv.innerHTML = `<strong>您:</strong><div class="message-content">${sanitizedQuestion.replace(/\n/g, '<br>')}</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
             chatBox.appendChild(userMsgDiv);
             autoScroll();
 
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'message ai-message';
-            aiMsgDiv.innerHTML = `
-                <strong>AI助手:</strong>
-                <div class="message-content">思考中...</div>
-                <div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>
-            `;
+            aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content">思考中...</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
             const aiMessageContentDiv = aiMsgDiv.querySelector('.message-content');
             const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
             chatBox.appendChild(aiMsgDiv);
             autoScroll();
 
             const csrftoken = getCookie('csrftoken');
-            if (!csrftoken) {
-                console.error('CSRF token not found');
-                showError('无法获取 CSRF token，请刷新页面');
-                sendBtn.disabled = false;
-                sendBtn.textContent = '发送';
-                aiMessageContentDiv.textContent = '请求准备失败。';
-                return;
-            }
+            if (!csrftoken) { console.error('CSRF token not found'); showError('CSRF Token 缺失'); sendBtn.disabled = false; sendBtn.textContent = '发送'; aiMessageContentDiv.textContent = '请求准备失败。'; return; }
+
+            let isNewConversationInternal = !currentConversationId; // Track if this specific sendMessage call initiated a new conversation
 
             try {
-                const response = await fetch('/chat/stream/', {
+                const response = await fetch("{% url 'ai_api:stream_chat_api' %}", { // Use Django URL template tag
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrftoken
-                    },
-                    body: JSON.stringify({ question, model, conversation_id: currentConversationId })
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                    body: JSON.stringify({ question, model, conversation_id: currentConversationId }) // Send null if new
                 });
 
                 if (!response.ok) {
                     const errorData = await response.text();
-                    throw new Error(`HTTP error ${response.status}: ${errorData}`);
-                }
-                
-                // Update conversation ID if it's a new chat and backend provides it
-                const newConvId = response.headers.get('X-Conversation-Id');
-                if (newConvId && !currentConversationId) {
-                    currentConversationId = newConvId;
-                    console.log("New conversation ID received and set:", currentConversationId); // <--- 添加日志
-                    // ...
-                    debounceUpdateSidebar();
+                    let detailErrorMessage = errorData;
+                    try { const jsonError = JSON.parse(errorData); if (jsonError && (jsonError.error || jsonError.detail)) { detailErrorMessage = jsonError.error || jsonError.detail; } } catch (e) { /* ignore */ }
+                    throw new Error(`HTTP error ${response.status}: ${detailErrorMessage}`);
                 }
 
                 const reader = response.body.getReader();
@@ -641,337 +248,230 @@
                 let buffer = '';
                 let currentContent = '';
                 let firstChunk = true;
-                let rawDataForDoneCheck = ''; // 初始化为空字符串
-                
+                let rawDataForDoneCheck = '';
+                let eol;
+                // console.log("Starting stream processing. Initial currentConversationId:", currentConversationId);
+
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        // console.log("Stream reader marked as done.");
+                        if (buffer.trim().startsWith('data: ')) {
+                            const lastLine = buffer.trim();
+                            rawDataForDoneCheck = lastLine.substring(6).trim();
+                            if (rawDataForDoneCheck !== '[DONE]') {
+                                try {
+                                    const data = JSON.parse(rawDataForDoneCheck);
+                                    if (data.content) {
+                                        if (firstChunk) { currentContent = data.content; firstChunk = false; } 
+                                        else { currentContent += data.content; }
+                                        aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
+                                    }
+                                    if (data.conversation_id && isNewConversationInternal) { // Only set if this call started as new
+                                        currentConversationId = data.conversation_id;
+                                        isNewConversationInternal = false; // Mark that ID is now set for this ongoing stream
+                                        console.log("New conversation ID from final stream data:", currentConversationId);
+                                        history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
+                                    }
+                                } catch (e) { console.warn('Error parsing final chunk:', rawDataForDoneCheck, e); }
+                            }
+                        }
+                        break; 
+                    }
 
                     buffer += decoder.decode(value, { stream: true });
-                    // Process buffer line by line (assuming Server-Sent Events like structure)
-                    let eol; // End of line
-                    // ...
-                    let eol; 
-                    let loopCount = 0; // 调试计数器
-                    while (true) {
-                        loopCount++;
-                        const { done, value } = await reader.read();
-                        console.log(`Stream loop ${loopCount}: done = ${done}, value received = ${value ? value.byteLength : 0} bytes`);
-    
-                        if (done) {
-                            console.log("Stream marked as done.");
-                            // ... (处理剩余 buffer)
-                            break;
-                        }
-    
-                        buffer += decoder.decode(value, { stream: true });
-                        console.log(`Buffer content length: ${buffer.length}`);
-                        
-                        while ((eol = buffer.indexOf('\n\n')) >= 0) {
-                            const line = buffer.substring(0, eol).trim();
-                            buffer = buffer.substring(eol + 2);
-                            console.log("Processing line:", line);
-
-                            if (line.startsWith('data: ')) {
-                                rawDataForDoneCheck = line.substring(6).trim();
-                                console.log("Parsed data string:", rawDataForDoneCheck);
-                                if (rawDataForDoneCheck === '[DONE]') {
-                                    console.log("[DONE] signal received in stream.");
-                                    // ...
-                                break; 
-                            }
-                            try {
-                                const data = JSON.parse(rawDataForDoneCheck);
-                                console.log("Parsed JSON data:", data);
-                                // ... (内容处理)
-                                aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); // 确保这行在更新 currentContent 后
-                            } catch (e) {
-                                console.error('解析流数据错误 during stream:', rawDataForDoneCheck, e);
-                                // ...
-                            }
-                        }
-                    }
-                     if (rawDataForDoneCheck === '[DONE]') {
-                        console.log("[DONE] signal breaking outer loop.");
-                        break;
-                     }
-                }
-                console.log("Exited stream processing loop.");
-                // ...
-                    
                     while ((eol = buffer.indexOf('\n\n')) >= 0) {
                         const line = buffer.substring(0, eol).trim();
                         buffer = buffer.substring(eol + 2);
-
                         if (line.startsWith('data: ')) {
-                            const rawData = line.substring(6);
-                            if (rawData === '[DONE]') {
-                                // Stream finished
-                                if (firstChunk && currentContent === '') { // Handle case where stream ends before any content
-                                   aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
-                                }
-                                break; 
-                            }
+                            rawDataForDoneCheck = line.substring(6).trim();
+                            if (rawDataForDoneCheck === '[DONE]') { break; }
                             try {
-                                const data = JSON.parse(rawData);
-                                if (data.error) {
-                                    currentContent = `发生错误: ${data.error}`;
-                                    aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
-                                    showError(data.error);
-                                    break; 
+                                const data = JSON.parse(rawDataForDoneCheck);
+                                if (data.conversation_id && isNewConversationInternal) {
+                                    currentConversationId = data.conversation_id;
+                                    isNewConversationInternal = false; 
+                                    console.log("New conversation ID from stream data:", currentConversationId);
+                                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
                                 }
-                                if (data.content) {
-                                    if (firstChunk) {
-                                        currentContent = data.content; // Overwrite "思考中..."
-                                        firstChunk = false;
-                                    } else {
-                                        currentContent += data.content;
-                                    }
+                                if (data.error) {
+                                    currentContent = `错误: ${data.error}`; showError(data.error); break; // Break inner on error too
+                                } else if (data.content) {
+                                    if (firstChunk) { currentContent = data.content; firstChunk = false; } 
+                                    else { currentContent += data.content; }
                                     aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
                                 }
                                 autoScroll();
-                            } catch (e) {
-                                console.error('解析流数据错误:', rawData, e);
-                                currentContent += "\n[数据解析错误]"; // Append to existing content
-                                aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
-                            }
+                            } catch (e) { console.error('解析流数据错误:', rawDataForDoneCheck, e); currentContent += "\n[数据解析错误]"; aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); }
                         }
                     }
-                     if (rawDataForDoneCheck === '[DONE]') break; // Break outer loop if [DONE] was processed
+                    if (rawDataForDoneCheck === '[DONE]') { break; }
                 }
-                 // Ensure any remaining buffer that is not [DONE] is processed if it's part of content
-                if (buffer.startsWith('data: ') && buffer.substring(6).trim() !== '[DONE]') {
-                    // process remaining partial data if any
-                    rawDataForDoneCheck = buffer.substring(6).trim(); // 赋值给已声明的变量
-                    try {
-                        const data = JSON.parse(rawDataForDoneCheck); // 使用已声明的变量
-                        if (data.content) {
-                            if (firstChunk) currentContent = data.content; else currentContent += data.content;
-                            aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
-                        }
-                    } catch (e) { /* ignore parsing error for potentially incomplete final chunk */ }
-                }
+                // console.log("Exited stream processing loop. Final currentConversationId:", currentConversationId);
 
+                if (rawDataForDoneCheck === '[DONE]' && firstChunk && currentContent === '') { aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。"); }
+                else if (currentContent === "" && !firstChunk) { aiMessageContentDiv.innerHTML = renderMarkdown("AI响应为空。"); }
+                else if (currentContent === "" && aiMessageContentDiv.textContent === '思考中...') { aiMessageContentDiv.innerHTML = renderMarkdown("AI未响应或响应超时。");}
 
             } catch (error) {
                 console.error('请求错误:', error);
-                aiMessageContentDiv.innerHTML = renderMarkdown(`请求失败: ${error.message || '请检查网络或联系管理员'}`);
+                aiMessageContentDiv.innerHTML = renderMarkdown(`请求失败: ${error.message || '请检查网络'}`);
                 showError(`请求失败: ${error.message || '请重试'}`);
             } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = '发送';
-                aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' }); // Update final timestamp
+                sendBtn.disabled = false; sendBtn.textContent = '发送';
+                aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
                 autoScroll();
-                if (firstChunk && currentContent === '') { // If loop exited early and no content
-                    aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，但未返回有效内容。");
-                }
-                // After message is fully received, if it was a new conversation, update sidebar
-                if (currentConversationId && !document.querySelector(`#conversation-list li[data-conversation-id="${currentConversationId}"]`)) {
-                    debounceUpdateSidebar();
-                } else if (currentConversationId) { // If existing chat, still good to refresh in case title changed etc.
-                    debounceUpdateSidebar();
+                if (firstChunk && currentContent === '' && aiMessageContentDiv.textContent === '思考中...') { aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，无有效内容。"); }
+                
+                // Update sidebar if a new conversation ID was established during this call
+                if (currentConversationId && !isNewConversationInternal) { // ID was set or existed
+                     // Check if the conversation is truly new (was null at start of sendMessage)
+                     // or if it's an existing one and we want to refresh sidebar (e.g. title changed by backend)
+                    const wasActuallyNew = (!userInput.value && !currentConversationId && aiMsgDiv.textContent.includes("思考中")); // Heuristic
+                    if(wasActuallyNew || (currentConversationId && document.querySelector(`#conversation-list li[data-conversation-id="${currentConversationId}"]`) === null)){
+                        console.log("New conversation concluded or ID confirmed, updating sidebar. Conv ID:", currentConversationId);
+                        debounceUpdateSidebar();
+                    }
                 }
             }
         }
 
         function renderMarkdown(text) {
-            // Configure marked to add line breaks for single newlines
-            const rawHtml = marked.parse(text, { breaks: true });
-            return DOMPurify.sanitize(rawHtml, {
-                USE_PROFILES: { html: true },
-                // Allow specific attributes for syntax highlighting if needed, e.g., class for <code>
-                ADD_ATTR: ['class'] 
-            });
+            const rawHtml = marked.parse(text, { breaks: true, gfm: true, pedantic: false, sanitize: false }); // sanitize:false as DOMPurify is used
+            return DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true }, ADD_ATTR: ['class'] });
         }
 
         function clearChat() {
-            // This function might need to interact with the backend if "clearing" means deleting messages from the current conversation
-            // For now, it just clears the UI. If currentConversationId is set, it should probably clear that conversation.
-            chatBox.innerHTML = '';
-            userInput.value = '';
-            userInput.style.height = 'auto';
-            hideError();
-            autoScroll();
-            // Consider if this should also call startNewConversation() or have a dedicated backend endpoint
-            // For a "ChatGPT-like" feel, "Clear Chat" usually implies deleting the current conversation and starting fresh.
-            // If so:
-            // if (currentConversationId) {
-            // deleteConversation(currentConversationId, true); // true to indicate it's a clear action
-            // } else {
-            // startNewConversation();
-            // }
-            showError("聊天记录已在界面清除。如需彻底删除，请新建对话或删除此对话。"); // Inform user
+            if (currentConversationId) {
+                 if (confirm('此操作会删除当前对话的所有聊天记录。确定清空吗？')) {
+                    deleteConversation(currentConversationId, true); // Pass true to indicate it's a clear action
+                 }
+            } else {
+                chatBox.innerHTML = '';
+                userInput.value = ''; userInput.style.height = 'auto';
+                hideError(); autoScroll();
+                showError("当前无对话，已清空输入区。");
+            }
         }
 
         function startNewConversation() {
             currentConversationId = null;
-            chatBox.innerHTML = ''; // Clear current chat messages
-            userInput.value = '';
-            userInput.style.height = 'auto';
+            chatBox.innerHTML = ''; 
+            userInput.value = ''; userInput.style.height = 'auto';
             hideError();
-            // Update URL to reflect new chat state if your app uses URL routing for conversations
-            history.pushState({}, '', '/stream_chat/'); // Assuming '/stream_chat/' is the base for new chats
+            history.pushState({}, '', "{% url 'ai_api:stream_chat_new' %}"); // Use Django URL for new chat page
             
-            // Deselect active item in sidebar
             const activeItem = conversationList.querySelector('li.active');
-            if (activeItem) {
-                activeItem.classList.remove('active');
-            }
+            if (activeItem) { activeItem.classList.remove('active'); }
             
-            console.log("New conversation started. Current ID:", currentConversationId);
-            // No need to call updateSidebar() immediately, as no new conversation is saved yet.
-            // It will be updated after the first message of the new conversation.
+            console.log("New conversation started (UI). currentConversationId:", currentConversationId);
+            // Sidebar will update after first message of new conversation establishes an ID
         }
         
         function debounceUpdateSidebar() {
-            const now = Date.now();
-            clearTimeout(window.sidebarUpdateTimer); // Clear existing timer
+            clearTimeout(window.sidebarUpdateTimer); 
             window.sidebarUpdateTimer = setTimeout(() => {
                 updateSidebar();
-                lastSidebarUpdate = Date.now();
             }, sidebarUpdateDebounce);
         }
 
         function updateSidebar() {
-            fetch('/chat/conversations/', {
-                headers: { 'X-CSRFToken': getCookie('csrftoken') }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('获取对话列表失败');
-                return response.json();
-            })
-            .then(data => {
-                console.log("Updating sidebar with conversations:", data.conversations); // <--- 添加日志
-                conversationList.innerHTML = ''; // Clear existing list
-                data.conversations.forEach(conv => {
-                    // ...
-                    // 检查 conv.id 和 conv.title 是否符合预期
-                    console.log(`Processing conv for sidebar: ID=<span class="math-inline">\{conv\.id\}, Title\=</span>{conv.title}, IsCurrent=${conv.id.toString() === currentConversationId}`);
-                    // ...
-                    const li = document.createElement('li');
-                    li.dataset.conversationId = conv.id;
-                    if (conv.id.toString() === currentConversationId) { // Ensure IDs are compared as strings if one might be number
-                        li.classList.add('active');
+            // console.log("Attempting to update sidebar. Current active ID:", currentConversationId);
+            fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } }) // Django URL
+                .then(response => { if (!response.ok) throw new Error('获取对话列表失败 ' + response.status); return response.json(); })
+                .then(data => {
+                    // console.log("Sidebar data received:", data.conversations);
+                    conversationList.innerHTML = ''; 
+                    if (data.conversations && data.conversations.length > 0) {
+                        data.conversations.forEach(conv => {
+                            // console.log(`Sidebar: Processing conv ID=${conv.id}, Title='${conv.title}'`);
+                            const li = document.createElement('li');
+                            li.dataset.conversationId = conv.id;
+                            if (conv.id.toString() === currentConversationId) {
+                                li.classList.add('active');
+                            }
+                            const sanitizedTitle = DOMPurify.sanitize(conv.title || '无标题对话');
+                            li.innerHTML = `<span class="title">${sanitizedTitle}</span><button class="delete-btn" title="删除对话" onclick="event.stopPropagation(); deleteConversation('${conv.id}')">🗑️</button>`;
+                            li.onclick = () => {
+                                if (currentConversationId !== conv.id.toString()) {
+                                    console.log("Switching to conversation:", conv.id);
+                                    currentConversationId = conv.id.toString(); 
+                                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`); // Manually construct URL
+                                    
+                                    document.querySelectorAll('#conversation-list li.active').forEach(item => item.classList.remove('active'));
+                                    li.classList.add('active');
+                                    loadMessagesForConversation(currentConversationId); 
+                                }
+                            };
+                            conversationList.appendChild(li);
+                        });
+                    } else {
+                        // console.log("No conversations to display in sidebar.");
                     }
-                    // Sanitize title before inserting
-                    const sanitizedTitle = DOMPurify.sanitize(conv.title || '无标题对话');
-                    li.innerHTML = `
-                        <span class="title">${sanitizedTitle}</span>
-                        <button class="delete-btn" title="删除对话" onclick="event.stopPropagation(); deleteConversation('${conv.id}')">🗑️</button>
-                    `;
-                   // ...
-                 li.onclick = () => {
-                      if (currentConversationId !== conv.id.toString()) {
-                          // window.location.href = `/stream_chat/${conv.id}/`; // 旧的：刷新页面
-                          console.log("Switching to conversation:", conv.id);
-                          chatBox.innerHTML = ''; // 清空当前聊天内容
-                          currentConversationId = conv.id.toString(); // 设置当前对话ID
-
-                          // 更新URL，不刷新页面
-                          history.pushState({conversation_id: currentConversationId}, '', `/stream_chat/${currentConversationId}/`);
-
-                          // 标记新的 active 项
-                          const currentlyActive = conversationList.querySelector('li.active');
-                          if (currentlyActive) currentlyActive.classList.remove('active');
-                          li.classList.add('active');
-
-                          loadMessagesForConversation(currentConversationId); // 加载新对话的消息
-                      }
-                  };
-                   // ...
-                    conversationList.appendChild(li);
-                });
-            })
-            .catch(err => {
-                console.error('侧边栏更新错误:', err);
-                // showError('无法加载对话历史'); // Optionally show error to user
-            });
+                })
+                .catch(err => { console.error('侧边栏更新错误:', err); /* showError('无法加载对话历史'); */ });
         }
 
         async function loadMessagesForConversation(conversationId) {
-            console.log(`Workspaceing messages for conversation ${conversationId}`);
+            if (!conversationId) {
+                // console.log("loadMessagesForConversation called with no ID, clearing chatbox.");
+                chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或选择一个已有对话。</p>';
+                return;
+            }
+            // console.log(`Workspaceing messages for conversation ${conversationId}`);
             chatBox.innerHTML = '<p style="text-align:center; color:#777;">正在加载聊天记录...</p>';
             try {
-                // 重要: 确保你的后端API路径是正确的
-                const response = await fetch(`/chat/messages/${conversationId}/`, {
-                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
-                });
-                if (!response.ok) {
-                    const errorText = await response.text();
-                     throw new Error(`获取消息失败: ${response.status} - ${errorText}`);
-                }
+                const url = `/chat/messages/${conversationId}/`; // Construct URL carefully
+                const response = await fetch(url, { headers: { 'X-CSRFToken': getCookie('csrftoken') } });
+                if (!response.ok) { const errorText = await response.text(); throw new Error(`获取消息失败 (${response.status}): ${errorText}`); }
                 const data = await response.json(); 
-                // 假设后端返回: { messages: [ { sender: 'user'/'ai', content: '...', timestamp: 'ISO_string_date' }, ... ] }
-
                 chatBox.innerHTML = ''; 
-                 if (data.messages && data.messages.length > 0) {
+                if (data.messages && data.messages.length > 0) {
                     data.messages.forEach(msg => {
                         const messageDiv = document.createElement('div');
                         messageDiv.className = `message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`;
-
-                        const sanitizedContent = msg.sender === 'ai' ? renderMarkdown(msg.content) : DOMPurify.sanitize(msg.content.replace(/\n/g, '<br>'), {USE_PROFILES: {html: true}});
-
-                        messageDiv.innerHTML = `
-                            <strong><span class="math-inline">\{msg\.sender \=\=\= 'user' ? '您' \: 'AI助手'\}\:</strong\>
+                        const sanitizedContent = msg.sender === 'ai' ? renderMarkdown(msg.content) : DOMPurify.sanitize(msg.content.replace(/\n/g, '<br>'), { USE_PROFILES: { html: true } });
+                        messageDiv.innerHTML = `<strong>${msg.sender === 'user' ? '您' : 'AI助手'}:</strong><div class="message-content">${sanitizedContent}</div><div class="message-timestamp">${new Date(msg.timestamp).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
+                        chatBox.appendChild(messageDiv);
+                    });
+                } else { chatBox.innerHTML = '<p style="text-align:center; color:#777;">此对话没有消息。</p>'; }
+            } catch (error) {
+                console.error('加载消息错误:', error);
+                chatBox.innerHTML = `<p style="text-align:center; color:var(--error-text);">加载聊天记录失败: ${error.message}</p>`;
+            } finally { scrollToBottom(); }
+        }
         
         function deleteConversation(conversationIdToDelete, isClearingChat = false) {
             const csrftoken = getCookie('csrftoken');
-            if (!csrftoken) {
-                showError('无法获取 CSRF token，请刷新页面');
-                return;
-            }
+            if (!csrftoken) { showError('CSRF Token 缺失'); return; }
 
-            if (!confirm(`确定要删除这个对话吗？此操作无法撤销。`)) {
-                return;
-            }
+            if (!isClearingChat && !confirm(`确定要永久删除这个对话吗？此操作无法撤销。`)) { return; }
 
-            fetch(`/chat/delete/${conversationIdToDelete}/`, {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrftoken }
+            fetch(`/chat/delete/${conversationIdToDelete}/`, { // Manually construct URL
+                method: 'POST', headers: { 'X-CSRFToken': csrftoken }
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showError('对话已删除。'); // Using showError for styled notifications
-                    if (conversationIdToDelete.toString() === currentConversationId) {
-                        // If current chat is deleted, redirect to new chat or base page
-                        startNewConversation(); // This will clear UI and reset currentConversationId
-                    }
-                    debounceUpdateSidebar(); // Refresh sidebar
-                } else {
-                    throw new Error(data.error || '删除失败');
-                }
-            })
-            .catch(err => {
-                console.error('删除对话错误:', err);
-                showError(`删除对话失败: ${err.message}`);
-            });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showError('对话已删除。'); 
+                        if (conversationIdToDelete.toString() === currentConversationId) {
+                            startNewConversation(); 
+                        }
+                        debounceUpdateSidebar(); 
+                    } else { throw new Error(data.error || '删除失败'); }
+                })
+                .catch(err => { console.error('删除对话错误:', err); showError(`删除对话失败: ${err.message}`); });
         }
 
-        // Initial actions on page load
         document.addEventListener('DOMContentLoaded', () => {
-            if (currentConversationId) {
-                 // If there's a current conversation, load its messages.
-                 // This part needs to be handled by your backend template rendering the initial messages,
-                 // or an AJAX call here to fetch them. The provided HTML only has a placeholder.
-                 // For now, we assume messages are pre-loaded if currentConversationId is set.
-                 console.log("Current conversation ID:", currentConversationId);
+            // console.log("DOM Content Loaded. Initial currentConversationId from Django:", currentConversationId);
+            if (currentConversationId) { 
+                loadMessagesForConversation(currentConversationId);
+            } else {
+                chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或从左侧选择一个已有对话。</p>';
             }
-            // Fetch initial conversation list for the sidebar
-            updateSidebar();
-            autoScroll(); // Initial scroll check
-
-            // If there are pre-loaded messages, ensure they are styled and scroll is correct
-            const existingMessages = chatBox.querySelectorAll('.message');
-            if (existingMessages.length > 0) {
-                // This logic was in your original script for historical messages,
-                // but it's better if historical messages are already rendered with Markdown by the server.
-                // If they are not, you'd iterate and render them.
-                // For now, just ensure scrolling is correct.
-                scrollToBottom(); // Scroll to bottom if there are existing messages
-            }
+            updateSidebar(); 
         });
-
     </script>
 </body>
 </html>
