@@ -641,7 +641,8 @@
                 let buffer = '';
                 let currentContent = '';
                 let firstChunk = true;
-
+                let rawDataForDoneCheck = ''; // 初始化为空字符串
+                
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
@@ -687,14 +688,14 @@
                             }
                         }
                     }
-                     if (rawData === '[DONE]') break; // Break outer loop if [DONE] was processed
+                     if (rawDataForDoneCheck === '[DONE]') break; // Break outer loop if [DONE] was processed
                 }
                  // Ensure any remaining buffer that is not [DONE] is processed if it's part of content
                 if (buffer.startsWith('data: ') && buffer.substring(6).trim() !== '[DONE]') {
                     // process remaining partial data if any
-                    const rawData = buffer.substring(6).trim();
+                    rawDataForDoneCheck = buffer.substring(6).trim(); // 赋值给已声明的变量
                     try {
-                        const data = JSON.parse(rawData);
+                        const data = JSON.parse(rawDataForDoneCheck); // 使用已声明的变量
                         if (data.content) {
                             if (firstChunk) currentContent = data.content; else currentContent += data.content;
                             aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
