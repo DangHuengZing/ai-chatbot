@@ -648,7 +648,7 @@
 
                     buffer += decoder.decode(value, { stream: true });
                     // Process buffer line by line (assuming Server-Sent Events like structure)
-                    leteol; // End of line
+                    let eol; // End of line
                     while ((eol = buffer.indexOf('\n\n')) >= 0) {
                         const line = buffer.substring(0, eol).trim();
                         buffer = buffer.substring(eol + 2);
