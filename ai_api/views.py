@@ -274,7 +274,8 @@ def get_conversation_messages(request, conversation_id): # 新增的 view
                 'timestamp': msg['timestamp'].isoformat() # 使用ISO格式方便前端解析
             } for msg in messages_qs
         ]
-        return JsonResponse({'messages': messages_list}, cls=DjangoJSONEncoder) # 使用cls处理datetime
+        # 使用 encoder 参数指定自定义的 JSON 编码器
+        return JsonResponse({'messages': messages_list}, encoder=DjangoJSONEncoder) 
     except ValueError: # Handle invalid UUID format from URL
         logger.warning(f"Invalid UUID format for conversation_id: {conversation_id}")
         return JsonResponse({'error': 'Invalid Conversation ID format'}, status=400)
