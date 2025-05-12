@@ -631,10 +631,10 @@
                 const newConvId = response.headers.get('X-Conversation-Id');
                 if (newConvId && !currentConversationId) {
                     currentConversationId = newConvId;
-                    // Optionally, update URL without reloading: history.pushState({}, '', `/stream_chat/${newConvId}/`);
-                    debounceUpdateSidebar(); // Update sidebar as a new conversation is created
+                    console.log("New conversation ID received and set:", currentConversationId); // <--- 添加日志
+                    // ...
+                    debounceUpdateSidebar();
                 }
-
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -650,6 +650,55 @@
                     buffer += decoder.decode(value, { stream: true });
                     // Process buffer line by line (assuming Server-Sent Events like structure)
                     let eol; // End of line
+                    // ...
+                    let eol; 
+                    let loopCount = 0; // 调试计数器
+                    while (true) {
+                        loopCount++;
+                        const { done, value } = await reader.read();
+                        console.log(`Stream loop ${loopCount}: done = ${done}, value received = ${value ? value.byteLength : 0} bytes`);
+    
+                        if (done) {
+                            console.log("Stream marked as done.");
+                            // ... (处理剩余 buffer)
+                            break;
+                        }
+    
+                        buffer += decoder.decode(value, { stream: true });
+                        console.log(`Buffer content length: ${buffer.length}`);
+                        
+                        while ((eol = buffer.indexOf('\n\n')) >= 0) {
+                            const line = buffer.substring(0, eol).trim();
+                            buffer = buffer.substring(eol + 2);
+                            console.log("Processing line:", line);
+
+                            if (line.startsWith('data: ')) {
+                                rawDataForDoneCheck = line.substring(6).trim();
+                                console.log("Parsed data string:", rawDataForDoneCheck);
+                                if (rawDataForDoneCheck === '[DONE]') {
+                                    console.log("[DONE] signal received in stream.");
+                                    // ...
+                                break; 
+                            }
+                            try {
+                                const data = JSON.parse(rawDataForDoneCheck);
+                                console.log("Parsed JSON data:", data);
+                                // ... (内容处理)
+                                aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); // 确保这行在更新 currentContent 后
+                            } catch (e) {
+                                console.error('解析流数据错误 during stream:', rawDataForDoneCheck, e);
+                                // ...
+                            }
+                        }
+                    }
+                     if (rawDataForDoneCheck === '[DONE]') {
+                        console.log("[DONE] signal breaking outer loop.");
+                        break;
+                     }
+                }
+                console.log("Exited stream processing loop.");
+                // ...
+                    
                     while ((eol = buffer.indexOf('\n\n')) >= 0) {
                         const line = buffer.substring(0, eol).trim();
                         buffer = buffer.substring(eol + 2);
@@ -792,8 +841,13 @@
                 return response.json();
             })
             .then(data => {
+                console.log("Updating sidebar with conversations:", data.conversations); // <--- 添加日志
                 conversationList.innerHTML = ''; // Clear existing list
                 data.conversations.forEach(conv => {
+                    // ...
+                    // 检查 conv.id 和 conv.title 是否符合预期
+                    console.log(`Processing conv for sidebar: ID=<span class="math-inline">\{conv\.id\}, Title\=</span>{conv.title}, IsCurrent=${conv.id.toString() === currentConversationId}`);
+                    // ...
                     const li = document.createElement('li');
                     li.dataset.conversationId = conv.id;
                     if (conv.id.toString() === currentConversationId) { // Ensure IDs are compared as strings if one might be number
@@ -805,12 +859,26 @@
                         <span class="title">${sanitizedTitle}</span>
                         <button class="delete-btn" title="删除对话" onclick="event.stopPropagation(); deleteConversation('${conv.id}')">🗑️</button>
                     `;
-                    li.onclick = () => {
-                        // Check if already on this conversation to prevent unnecessary reload
-                        if (currentConversationId !== conv.id.toString()) {
-                           window.location.href = `/stream_chat/${conv.id}/`;
-                        }
-                    };
+                   // ...
+                 li.onclick = () => {
+                      if (currentConversationId !== conv.id.toString()) {
+                          // window.location.href = `/stream_chat/${conv.id}/`; // 旧的：刷新页面
+                          console.log("Switching to conversation:", conv.id);
+                          chatBox.innerHTML = ''; // 清空当前聊天内容
+                          currentConversationId = conv.id.toString(); // 设置当前对话ID
+
+                          // 更新URL，不刷新页面
+                          history.pushState({conversation_id: currentConversationId}, '', `/stream_chat/${currentConversationId}/`);
+
+                          // 标记新的 active 项
+                          const currentlyActive = conversationList.querySelector('li.active');
+                          if (currentlyActive) currentlyActive.classList.remove('active');
+                          li.classList.add('active');
+
+                          loadMessagesForConversation(currentConversationId); // 加载新对话的消息
+                      }
+                  };
+                   // ...
                     conversationList.appendChild(li);
                 });
             })
@@ -820,6 +888,32 @@
             });
         }
 
+        async function loadMessagesForConversation(conversationId) {
+            console.log(`Workspaceing messages for conversation ${conversationId}`);
+            chatBox.innerHTML = '<p style="text-align:center; color:#777;">正在加载聊天记录...</p>';
+            try {
+                // 重要: 确保你的后端API路径是正确的
+                const response = await fetch(`/chat/messages/${conversationId}/`, {
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                     throw new Error(`获取消息失败: ${response.status} - ${errorText}`);
+                }
+                const data = await response.json(); 
+                // 假设后端返回: { messages: [ { sender: 'user'/'ai', content: '...', timestamp: 'ISO_string_date' }, ... ] }
+
+                chatBox.innerHTML = ''; 
+                 if (data.messages && data.messages.length > 0) {
+                    data.messages.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = `message ${msg.sender === 'user' ? 'user-message' : 'ai-message'}`;
+
+                        const sanitizedContent = msg.sender === 'ai' ? renderMarkdown(msg.content) : DOMPurify.sanitize(msg.content.replace(/\n/g, '<br>'), {USE_PROFILES: {html: true}});
+
+                        messageDiv.innerHTML = `
+                            <strong><span class="math-inline">\{msg\.sender \=\=\= 'user' ? '您' \: 'AI助手'\}\:</strong\>
+        
         function deleteConversation(conversationIdToDelete, isClearingChat = false) {
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) {
