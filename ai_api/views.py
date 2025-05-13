@@ -8,15 +8,16 @@ from django.conf import settings
 from django.shortcuts import render
 from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
-# from django.views.decorators.csrf import csrf_exempt # 考虑移除，如果前端正确发送 CSRF token
+# from django.views.decorators.csrf import csrf_exempt # 考虑移除
 from django.contrib.auth import authenticate, login, logout
 from .models import ChatMessage
-from django.core.serializers.json import DjangoJSONEncoder # 用于处理 datetime 对象序列化
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db.models import Max
 
 logger = logging.getLogger(__name__)
 
+# --- login_user, logout_user, stream_chat_page 保持不变 ---
 def login_user(request):
-    """处理用户登录和渲染登录页面"""
     if request.method == 'GET':
         return render(request, 'ai_api/login.html')
     if request.method == 'POST':
@@ -38,7 +39,6 @@ def login_user(request):
             return JsonResponse({'error': str(e)}, status=500)
 
 def logout_user(request):
-    """用户登出"""
     if request.method == 'GET': 
         logout(request)
         return JsonResponse({'success': True}, status=200)
@@ -46,25 +46,21 @@ def logout_user(request):
 
 @login_required
 def stream_chat_page(request, conversation_id=None):
-    """返回聊天页面"""
-    # 初始消息将由前端通过API加载
     return render(request, 'ai_api/stream_chat.html', {
         'username': request.user.username,
         'current_conversation_id': str(conversation_id) if conversation_id else ''
     })
 
-
+# --- stream_chat 保持不变 (使用您确认流式效果有所改善的版本) ---
 @login_required
-# @csrf_exempt # 考虑移除，如果前端正确发送 CSRF token
+# @csrf_exempt 
 def stream_chat(request):
-    """处理流式聊天请求"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
-
     try:
         body = json.loads(request.body)
         question = body.get('question', '')
-        model_choice = body.get('model', 'v3') # 从前端获取模型选择
+        model_choice = body.get('model', 'v3') 
         conversation_id_str = body.get('conversation_id')
 
         is_new_conversation = False
@@ -84,7 +80,7 @@ def stream_chat(request):
         ChatMessage.objects.create(
             user=request.user,
             conversation_id=conversation_id, 
-            model_type=model_choice, # 保存选择的模型
+            model_type=model_choice, 
             role='user',
             content=question,
             is_stream=True 
@@ -92,13 +88,11 @@ def stream_chat(request):
 
         if not hasattr(settings, 'DEEPSEEK_API_KEY') or not settings.DEEPSEEK_API_KEY:
             logger.error("DEEPSEEK_API_KEY not configured.")
-            # 确保即使出错也发送 [DONE] 信号
             def error_stream_key():
                 yield f"data: {json.dumps({'error': 'API key not configured'})}\n\n"
                 yield 'data: [DONE]\n\n'
             return StreamingHttpResponse(error_stream_key(), content_type="text/event-stream")
 
-        # 获取最近的10条历史消息（不包括当前用户刚发送的这条）
         history_qs = ChatMessage.objects.filter(
             user=request.user, 
             conversation_id=conversation_id
@@ -107,32 +101,27 @@ def stream_chat(request):
         messages_for_api = [{'role': 'assistant' if msg.role == 'ai' else msg.role, 'content': msg.content} for msg in reversed(history_qs)] 
         messages_for_api.append({'role': 'user', 'content': question})
 
-
         api_model_name = "deepseek-chat" if model_choice == "v3" else "deepseek-coder"
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json',
-            'Accept': 'application/json' # 有些API可能需要
+            'Accept': 'application/json'
         }
         payload = {
             'model': api_model_name,
             'messages': messages_for_api,
             'stream': True,
-            # 'temperature': 0.7, # 可以根据需要调整参数
-            # 'max_tokens': 2048,
         }
         
         logger.debug(f"Sending to DeepSeek API for conv {conversation_id} with model {api_model_name}: {json.dumps(payload, ensure_ascii=False)}")
         api_response = None 
         try:
             api_response = requests.post(
-                settings.DEEPSEEK_API_URL if hasattr(settings, 'DEEPSEEK_API_URL') else "https://api.deepseek.com/v1/chat/completions", # 从settings读取URL
+                settings.DEEPSEEK_API_URL if hasattr(settings, 'DEEPSEEK_API_URL') else "https://api.deepseek.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
                 stream=True,
-                timeout= (15, 180) # (connect_timeout, read_timeout for each chunk)
-                                  # read_timeout 应该大于 Gunicorn worker timeout / N (N是预期块数)
-                                  # 或者简单地设置一个足够大的值，让Gunicorn的超时先生效
+                timeout= (15, 180) 
             )
             api_response.raise_for_status() 
         except requests.exceptions.Timeout:
@@ -152,9 +141,6 @@ def stream_chat(request):
 
         def event_stream_generator():
             full_ai_content = ""
-            # is_new_conversation (来自外部作用域)
-            # conversation_id (来自外部作用域)
-            # model_choice (来自外部作用域)
             sent_conversation_id_in_stream = False 
             try: 
                 logger.debug(f"Starting event_stream_generator for conv {conversation_id}")
@@ -175,17 +161,16 @@ def stream_chat(request):
                             ChatMessage.objects.create(
                                 user=request.user,
                                 conversation_id=conversation_id,
-                                model_type=model_choice, # 使用正确的模型类型
+                                model_type=model_choice, 
                                 role='ai',
                                 content=full_ai_content,
-                                is_stream=True # 标记这是流式交互的AI回复
+                                is_stream=True
                             )
                         yield 'data: [DONE]\n\n'
                         break 
                     
                     try:
                         parsed_chunk = json.loads(raw_data)
-                        # DeepSeek API 结构: choices -> 0 -> delta -> content
                         delta_content = parsed_chunk.get('choices', [{}])[0].get('delta', {}).get('content', '')
                         
                         if delta_content:
@@ -235,54 +220,79 @@ def stream_chat(request):
 
 @login_required
 def get_conversations(request):
-    """返回用户的对话列表，确保标题的获取是高效的"""
-    # 获取用户所有不同的 conversation_id，并按每个对话的最新消息时间降序排列
-    # 这需要更复杂的查询，或者在 ChatMessage 模型中增加一个 last_updated_at 字段来代表对话的最后活动时间
-    # 简单版本：仍然按ID获取，然后可以在前端排序或后端基于第一条消息的时间排序（如果需要）
-    
-    # 获取所有不同的 conversation_id
-    # 使用 .distinct('conversation_id') 配合 .order_by('conversation_id', '-timestamp') 
-    # 来获取每个对话的最新时间戳，但这需要数据库支持 distinct on fields (如 PostgreSQL)
-    # 更通用的方法是先获取 distinct ids，再为每个id获取标题和时间
-    
-    conversation_ids_qs = ChatMessage.objects.filter(user=request.user).values_list('conversation_id', flat=True).distinct()
-    
-    conversation_list = []
-    for conv_id_uuid in conversation_ids_qs:
-        # 获取每个对话的第一条用户消息作为标题（如果存在），否则用AI的第一条
-        # 或者，可以考虑为对话单独建一个 Conversation 模型来存储标题和最后更新时间
+    """返回用户的对话列表，强制确保ID唯一，并按最后活动时间排序"""
+    logger.info(f"get_conversations called by user: {request.user.username}")
+
+    # 步骤1: 获取所有相关的对话数据，包括conversation_id和每个对话的最后时间戳
+    # values('conversation_id') 和 annotate(Max('timestamp')) 会为每个唯一的 conversation_id 生成一行
+    raw_conversations_data = ChatMessage.objects.filter(
+        user=request.user
+    ).values(
+        'conversation_id' 
+    ).annotate(
+        last_updated_ts=Max('timestamp') 
+    ).order_by('-last_updated_ts') # 初步排序
+
+    logger.debug(f"Raw distinct conversation data from DB (should be unique by conversation_id): {list(raw_conversations_data)}")
+
+    # 步骤2: 为每个唯一的 conversation_id 构建对话信息，并使用字典确保最终输出的 ID 字符串是唯一的
+    # (这一步主要是为了应对如果DB层或ORM的 distinct/annotate 行为在某些边缘情况下不符合预期)
+    final_conversations_dict = {}
+
+    for conv_data in raw_conversations_data:
+        conv_id_uuid = conv_data['conversation_id'] # 这是UUID对象
+        conv_id_str = str(conv_id_uuid) # 转换为字符串，用作字典的键
+
+        # 如果这个字符串ID已经处理过，则跳过 (理论上不应该发生，因为上一步查询应该已去重)
+        if conv_id_str in final_conversations_dict:
+            logger.warning(f"Duplicate string conversation_id '{conv_id_str}' encountered after DB query in get_conversations. Skipping.")
+            continue
+            
+        # 获取该对话的第一条消息作为标题
+        # 优先用户的第一条消息，其次是AI的第一条
         first_user_message = ChatMessage.objects.filter(user=request.user, conversation_id=conv_id_uuid, role='user').order_by('timestamp').first()
         title_message = first_user_message
-        
-        if not title_message: # 如果没有用户消息，尝试找AI消息
+        if not title_message:
             title_message = ChatMessage.objects.filter(user=request.user, conversation_id=conv_id_uuid).order_by('timestamp').first()
 
         if title_message:
-            title = title_message.content[:30] 
+            title = title_message.content[:30]
             if len(title_message.content) > 30:
                 title += "..."
             
-            # 获取该对话的最后一条消息的时间戳，用于排序
-            last_msg_timestamp = ChatMessage.objects.filter(user=request.user, conversation_id=conv_id_uuid).latest('timestamp').timestamp
-
-            conversation_list.append({
-                'id': str(conv_id_uuid),
+            final_conversations_dict[conv_id_str] = {
+                'id': conv_id_str,
                 'title': title,
-                'last_updated': last_msg_timestamp 
-            })
-            
-    # 按最后更新时间降序排序
-    conversation_list.sort(key=lambda x: x.get('last_updated'), reverse=True)
-            
-    return JsonResponse({'conversations': conversation_list}, encoder=DjangoJSONEncoder)
+                'last_updated': conv_data['last_updated_ts'].isoformat() if conv_data['last_updated_ts'] else None 
+            }
+        else:
+            # 如果一个对话ID存在但没有任何消息 (例如，用户消息保存了，但AI回复前出错了且未保存)
+            # 我们可以选择不显示它，或者给一个默认标题
+            logger.warning(f"Conversation ID {conv_id_uuid} (str: {conv_id_str}) has no messages to derive a title. It will not be included in the list.")
+            # 或者，如果你想包含它：
+            # final_conversations_dict[conv_id_str] = {
+            #     'id': conv_id_str,
+            #     'title': '对话无内容',
+            #     'last_updated': conv_data['last_updated_ts'].isoformat() if conv_data['last_updated_ts'] else None
+            # }
+
+    # 从字典的值创建列表，它已经是按 last_updated_ts 降序的（因为原始查询已排序）
+    # 如果需要再次排序（例如，如果字典的迭代顺序不保证），可以取消下面这行注释
+    # final_list = sorted(list(final_conversations_dict.values()), key=lambda x: x.get('last_updated'), reverse=True)
+    final_list = list(final_conversations_dict.values())
 
 
+    logger.info(f"get_conversations for user {request.user.username} processed. Returning {len(final_list)} unique conversations.")
+    logger.debug(f"Final unique conversation list being sent: {final_list}")
+    
+    return JsonResponse({'conversations': final_list}, encoder=DjangoJSONEncoder)
+
+
+# --- get_conversation_messages 和 delete_conversation 保持不变 ---
 @login_required
 def get_conversation_messages(request, conversation_id):
-    """返回指定会话的所有消息"""
     if not conversation_id:
         return JsonResponse({'error': 'Conversation ID is required'}, status=400)
-    
     try:
         conv_id_uuid = uuid.UUID(str(conversation_id)) 
         messages_qs = ChatMessage.objects.filter(
@@ -305,14 +315,11 @@ def get_conversation_messages(request, conversation_id):
         logger.error(f"Error fetching messages for conversation {conversation_id}: {e}", exc_info=True)
         return JsonResponse({'error': f'Error fetching messages: {e}'}, status=500)
 
-
 @login_required
-# @csrf_exempt # 考虑移除
+# @csrf_exempt
 def delete_conversation(request, conversation_id):
-    """删除指定会话的所有消息"""
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
-    
     try:
         conv_id_uuid = uuid.UUID(str(conversation_id)) 
         count, _ = ChatMessage.objects.filter(user=request.user, conversation_id=conv_id_uuid).delete()
