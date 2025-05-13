@@ -114,7 +114,7 @@
     </div>
 
     <script>
-        let currentConversationId = '{{ current_conversation_id|default:""|escapejs }}'; // escapejs for safety
+        let currentConversationId = '{{ current_conversation_id|default:""|escapejs }}';
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
@@ -125,13 +125,13 @@
 
         let isUserScrolling = false;
         let lastSidebarUpdate = 0;
-        const sidebarUpdateDebounce = 1000; 
+        const sidebarUpdateDebounce = 1000;
 
-        if (currentConversationId === '' || currentConversationId === 'None') { // Django might pass 'None' string
+        if (currentConversationId === '' || currentConversationId === 'None') {
             currentConversationId = null;
         }
 
-        userInput.addEventListener('input', () => {
+        userInput.addEventListener('input', () => { /* ... textarea auto-resize ... */
             userInput.style.height = 'auto'; 
             let newHeight = userInput.scrollHeight;
             const maxHeight = 200; 
@@ -144,33 +144,31 @@
             userInput.style.height = `${newHeight}px`;
         });
 
-        function autoScroll() {
+        function autoScroll() { /* ... autoScroll logic ... */
             const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150; 
             if (isNearBottom && !isUserScrolling) {
                 chatBox.scrollTop = chatBox.scrollHeight;
                 scrollToBottomBtn.style.display = 'none';
-            } else if (!isNearBottom && chatBox.scrollHeight > chatBox.clientHeight + 50) { // Only show if significant scroll needed
+            } else if (!isNearBottom && chatBox.scrollHeight > chatBox.clientHeight + 50) { 
                 scrollToBottomBtn.style.display = 'block';
             } else {
                 scrollToBottomBtn.style.display = 'none';
             }
         }
-
-        function scrollToBottom() {
+        function scrollToBottom() { /* ... scrollToBottom logic ... */
             chatBox.scrollTop = chatBox.scrollHeight;
             scrollToBottomBtn.style.display = 'none';
             isUserScrolling = false;
         }
-
         let scrollTimeout;
-        chatBox.addEventListener('scroll', () => {
+        chatBox.addEventListener('scroll', () => { /* ... scroll event logic ... */
             isUserScrolling = true;
             clearTimeout(scrollTimeout);
             scrollTimeout = setTimeout(() => { isUserScrolling = false; }, 300); 
-            autoScroll(); // Update button visibility on scroll
+            autoScroll();
         });
 
-        function getCookie(name) {
+        function getCookie(name) { /* ... getCookie logic ... */
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
                 const cookies = document.cookie.split(';');
@@ -184,27 +182,32 @@
             }
             return cookieValue;
         }
-
-        function hideError() { errorMessageContainer.style.display = 'none'; errorMessageText.textContent = ''; }
-        function showError(message) { errorMessageText.textContent = message; errorMessageContainer.style.display = 'flex'; setTimeout(hideError, 7000); } // Longer display for errors
-
-        function logout() {
+        function hideError() { /* ... hideError logic ... */
+            errorMessageContainer.style.display = 'none'; errorMessageText.textContent = '';
+        }
+        function showError(message) { /* ... showError logic ... */
+            errorMessageText.textContent = message; errorMessageContainer.style.display = 'flex'; setTimeout(hideError, 7000);
+        }
+        function logout() { /* ... logout logic ... */
             const logoutBtn = document.getElementById('logout-btn');
             logoutBtn.disabled = true; logoutBtn.textContent = '登出中...';
-            fetch("{% url 'ai_api:logout' %}", { method: 'GET' }) // Use Django URL template tag
+            fetch("{% url 'ai_api:logout' %}", { method: 'GET' }) 
                 .then(response => response.json())
                 .then(data => { if (data.success) { window.location.href = "{% url 'ai_api:login' %}"; } else { showError(data.error || '登出失败'); } })
                 .catch(err => { console.error('登出错误:', err); showError('登出通讯失败'); })
                 .finally(() => { logoutBtn.disabled = false; logoutBtn.textContent = '登出'; });
         }
-
-        function handleKeydown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }
+        function handleKeydown(event) { /* ... handleKeydown logic ... */
+             if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }
+        }
 
         async function sendMessage() {
+            console.log("sendMessage called. currentConversationId at start:", currentConversationId);
             const question = userInput.value.trim();
             const model = document.getElementById('model-select').value;
             if (!question) return;
-            let firstChunk = true;
+            
+            let firstChunk = true; // Correctly declared at the function scope
 
             sendBtn.disabled = true; sendBtn.textContent = '思考中';
             userInput.value = ''; userInput.style.height = 'auto';
@@ -228,13 +231,15 @@
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) { console.error('CSRF token not found'); showError('CSRF Token 缺失'); sendBtn.disabled = false; sendBtn.textContent = '发送'; aiMessageContentDiv.textContent = '请求准备失败。'; return; }
 
-            let isNewConversationInternal = !currentConversationId; // Track if this specific sendMessage call initiated a new conversation
+            let isNewConversationInternal = !currentConversationId;
+            let tempCurrentConversationIdDuringStream = currentConversationId; // Use a temp var for ID set during stream
 
+            console.log("Sending to backend:", { question, model, conversation_id: tempCurrentConversationIdDuringStream });
             try {
-                const response = await fetch("{% url 'ai_api:stream_chat_api' %}", { // Use Django URL template tag
+                const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-                    body: JSON.stringify({ question, model, conversation_id: currentConversationId }) // Send null if new
+                    body: JSON.stringify({ question, model, conversation_id: tempCurrentConversationIdDuringStream })
                 });
 
                 if (!response.ok) {
@@ -250,13 +255,16 @@
                 let currentContent = '';
                 let rawDataForDoneCheck = '';
                 let eol;
-                // console.log("Starting stream processing. Initial currentConversationId:", currentConversationId);
+                // console.log("Starting stream processing. Initial currentConversationId for stream:", tempCurrentConversationIdDuringStream);
 
+                // --- Outer loop for reading stream chunks ---
                 while (true) {
                     const { done, value } = await reader.read();
+                    // console.log(`Stream outer loop: done = ${done}, value received = ${value ? value.byteLength : 0} bytes`);
+
                     if (done) {
                         // console.log("Stream reader marked as done.");
-                        if (buffer.trim().startsWith('data: ')) {
+                        if (buffer.trim().startsWith('data: ')) { // Process any remaining data in buffer
                             const lastLine = buffer.trim();
                             rawDataForDoneCheck = lastLine.substring(6).trim();
                             if (rawDataForDoneCheck !== '[DONE]') {
@@ -267,11 +275,12 @@
                                         else { currentContent += data.content; }
                                         aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
                                     }
-                                    if (data.conversation_id && isNewConversationInternal) { // Only set if this call started as new
-                                        currentConversationId = data.conversation_id;
-                                        isNewConversationInternal = false; // Mark that ID is now set for this ongoing stream
-                                        console.log("New conversation ID from final stream data:", currentConversationId);
-                                        history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
+                                    if (data.conversation_id && isNewConversationInternal) {
+                                        tempCurrentConversationIdDuringStream = data.conversation_id; // Update temp ID
+                                        // currentConversationId = data.conversation_id; // Update global only after stream confirmed
+                                        isNewConversationInternal = false; 
+                                        // console.log("New conversation ID from final stream data (temp):", tempCurrentConversationIdDuringStream);
+                                        // history.pushState({ conversation_id: tempCurrentConversationIdDuringStream }, '', `/stream_chat/${tempCurrentConversationIdDuringStream}/`);
                                     }
                                 } catch (e) { console.warn('Error parsing final chunk:', rawDataForDoneCheck, e); }
                             }
@@ -280,38 +289,75 @@
                     }
 
                     buffer += decoder.decode(value, { stream: true });
+                    // console.log(`Buffer content now (length ${buffer.length}): "${buffer}"`);
+                    
+                    // --- Inner loop for processing complete SSE messages in buffer ---
                     while ((eol = buffer.indexOf('\n\n')) >= 0) {
                         const line = buffer.substring(0, eol).trim();
                         buffer = buffer.substring(eol + 2);
+                        // console.log(`Processing line from buffer: "${line}"`);
+
                         if (line.startsWith('data: ')) {
                             rawDataForDoneCheck = line.substring(6).trim();
-                            if (rawDataForDoneCheck === '[DONE]') { break; }
+                            // console.log(`Parsed data string from line: "${rawDataForDoneCheck}"`);
+
+                            if (rawDataForDoneCheck === '[DONE]') {
+                                // console.log("[DONE] signal received in stream's data line. Breaking inner loop.");
+                                break; 
+                            }
                             try {
                                 const data = JSON.parse(rawDataForDoneCheck);
+                                // console.log("Parsed JSON data from line:", data);
+
                                 if (data.conversation_id && isNewConversationInternal) {
-                                    currentConversationId = data.conversation_id;
+                                    tempCurrentConversationIdDuringStream = data.conversation_id; // Update temp ID
+                                    // currentConversationId = data.conversation_id; // Update global only after stream confirmed
                                     isNewConversationInternal = false; 
-                                    console.log("New conversation ID from stream data:", currentConversationId);
-                                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
+                                    console.log("New conversation ID from stream data (temp):", tempCurrentConversationIdDuringStream);
+                                    // History update will happen once after the stream is fully processed if ID is new.
                                 }
+
                                 if (data.error) {
-                                    currentContent = `错误: ${data.error}`; showError(data.error); break; // Break inner on error too
+                                    currentContent = `错误: ${data.error}`; 
+                                    showError(data.error); 
+                                    rawDataForDoneCheck = '[DONE]'; 
+                                    break; 
                                 } else if (data.content) {
-                                    if (firstChunk) { currentContent = data.content; firstChunk = false; } 
-                                    else { currentContent += data.content; }
-                                    aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
+                                    if (firstChunk) { 
+                                        currentContent = data.content; 
+                                        firstChunk = false; 
+                                    } else { 
+                                        currentContent += data.content; 
+                                    }
+                                    aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); 
+                                    // console.log("Updated AI message content with chunk.");
                                 }
-                                autoScroll();
-                            } catch (e) { console.error('解析流数据错误:', rawDataForDoneCheck, e); currentContent += "\n[数据解析错误]"; aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); }
+                                // autoScroll(); // Scroll after each chunk might be too frequent, scroll after all chunks in a message or at end.
+                            } catch (e) { 
+                                console.error('解析流数据错误:', rawDataForDoneCheck, e); 
+                                currentContent += "\n[数据解析错误]"; 
+                                aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); 
+                            }
                         }
+                    } 
+                    if (rawDataForDoneCheck === '[DONE]') {
+                        // console.log("[DONE] signal breaking outer stream loop after inner loop processing.");
+                        break; 
                     }
-                    if (rawDataForDoneCheck === '[DONE]') { break; }
-                }
-                // console.log("Exited stream processing loop. Final currentConversationId:", currentConversationId);
+                } 
+                // console.log("Exited stream processing loop. Final tempCurrentConversationIdDuringStream:", tempCurrentConversationIdDuringStream);
 
                 if (rawDataForDoneCheck === '[DONE]' && firstChunk && currentContent === '') { aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。"); }
                 else if (currentContent === "" && !firstChunk) { aiMessageContentDiv.innerHTML = renderMarkdown("AI响应为空。"); }
-                else if (currentContent === "" && aiMessageContentDiv.textContent === '思考中...') { aiMessageContentDiv.innerHTML = renderMarkdown("AI未响应或响应超时。");}
+                else if (currentContent === "" && aiMessageContentDiv.textContent.includes('思考中...')) { aiMessageContentDiv.innerHTML = renderMarkdown("AI未响应或响应超时。");}
+
+                // If a new conversation ID was established during the stream, update the global currentConversationId
+                if (tempCurrentConversationIdDuringStream && tempCurrentConversationIdDuringStream !== currentConversationId && !currentConversationId) {
+                    currentConversationId = tempCurrentConversationIdDuringStream;
+                    console.log("Global currentConversationId updated to:", currentConversationId);
+                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
+                }
+
 
             } catch (error) {
                 console.error('请求错误:', error);
@@ -320,31 +366,33 @@
             } finally {
                 sendBtn.disabled = false; sendBtn.textContent = '发送';
                 aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
-                autoScroll();
-                if (firstChunk && currentContent === '' && aiMessageContentDiv.textContent === '思考中...') { aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，无有效内容。"); }
+                autoScroll(); // Scroll once after all processing is done
+                if (firstChunk && currentContent === '' && aiMessageContentDiv.textContent.includes('思考中...')) { 
+                    aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，无有效内容。"); 
+                }
                 
-                // Update sidebar if a new conversation ID was established during this call
-                if (currentConversationId && !isNewConversationInternal) { // ID was set or existed
-                     // Check if the conversation is truly new (was null at start of sendMessage)
-                     // or if it's an existing one and we want to refresh sidebar (e.g. title changed by backend)
-                    const wasActuallyNew = (!userInput.value && !currentConversationId && aiMsgDiv.textContent.includes("思考中")); // Heuristic
-                    if(wasActuallyNew || (currentConversationId && document.querySelector(`#conversation-list li[data-conversation-id="${currentConversationId}"]`) === null)){
-                        console.log("New conversation concluded or ID confirmed, updating sidebar. Conv ID:", currentConversationId);
-                        debounceUpdateSidebar();
+                // Sidebar update logic
+                let needsSidebarUpdate = false;
+                if (currentConversationId) { 
+                    if (document.querySelector(`#conversation-list li[data-conversation-id="${currentConversationId}"]`) === null) {
+                        needsSidebarUpdate = true;
+                        console.log("Sidebar update needed: New conv ID or not yet in list.", currentConversationId);
                     }
+                }
+                if (needsSidebarUpdate) {
+                    debounceUpdateSidebar();
                 }
             }
         }
 
-        function renderMarkdown(text) {
-            const rawHtml = marked.parse(text, { breaks: true, gfm: true, pedantic: false, sanitize: false }); // sanitize:false as DOMPurify is used
+        function renderMarkdown(text) { /* ... renderMarkdown logic ... */
+            const rawHtml = marked.parse(text, { breaks: true, gfm: true, pedantic: false, sanitize: false });
             return DOMPurify.sanitize(rawHtml, { USE_PROFILES: { html: true }, ADD_ATTR: ['class'] });
         }
-
-        function clearChat() {
+        function clearChat() { /* ... clearChat logic ... */
             if (currentConversationId) {
                  if (confirm('此操作会删除当前对话的所有聊天记录。确定清空吗？')) {
-                    deleteConversation(currentConversationId, true); // Pass true to indicate it's a clear action
+                    deleteConversation(currentConversationId, true); 
                  }
             } else {
                 chatBox.innerHTML = '';
@@ -353,38 +401,31 @@
                 showError("当前无对话，已清空输入区。");
             }
         }
-
-        function startNewConversation() {
+        function startNewConversation() { /* ... startNewConversation logic ... */
             currentConversationId = null;
             chatBox.innerHTML = ''; 
             userInput.value = ''; userInput.style.height = 'auto';
             hideError();
-            history.pushState({}, '', "{% url 'ai_api:stream_chat_new' %}"); // Use Django URL for new chat page
+            history.pushState({}, '', "{% url 'ai_api:stream_chat_new' %}"); 
             
             const activeItem = conversationList.querySelector('li.active');
             if (activeItem) { activeItem.classList.remove('active'); }
             
             console.log("New conversation started (UI). currentConversationId:", currentConversationId);
-            // Sidebar will update after first message of new conversation establishes an ID
         }
-        
-        function debounceUpdateSidebar() {
+        function debounceUpdateSidebar() { /* ... debounceUpdateSidebar logic ... */
             clearTimeout(window.sidebarUpdateTimer); 
             window.sidebarUpdateTimer = setTimeout(() => {
                 updateSidebar();
             }, sidebarUpdateDebounce);
         }
-
-        function updateSidebar() {
-            // console.log("Attempting to update sidebar. Current active ID:", currentConversationId);
-            fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } }) // Django URL
+        function updateSidebar() { /* ... updateSidebar logic ... */
+            fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } }) 
                 .then(response => { if (!response.ok) throw new Error('获取对话列表失败 ' + response.status); return response.json(); })
                 .then(data => {
-                    // console.log("Sidebar data received:", data.conversations);
                     conversationList.innerHTML = ''; 
                     if (data.conversations && data.conversations.length > 0) {
                         data.conversations.forEach(conv => {
-                            // console.log(`Sidebar: Processing conv ID=${conv.id}, Title='${conv.title}'`);
                             const li = document.createElement('li');
                             li.dataset.conversationId = conv.id;
                             if (conv.id.toString() === currentConversationId) {
@@ -396,7 +437,7 @@
                                 if (currentConversationId !== conv.id.toString()) {
                                     console.log("Switching to conversation:", conv.id);
                                     currentConversationId = conv.id.toString(); 
-                                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`); // Manually construct URL
+                                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`); 
                                     
                                     document.querySelectorAll('#conversation-list li.active').forEach(item => item.classList.remove('active'));
                                     li.classList.add('active');
@@ -405,23 +446,18 @@
                             };
                             conversationList.appendChild(li);
                         });
-                    } else {
-                        // console.log("No conversations to display in sidebar.");
                     }
                 })
-                .catch(err => { console.error('侧边栏更新错误:', err); /* showError('无法加载对话历史'); */ });
+                .catch(err => { console.error('侧边栏更新错误:', err); });
         }
-
-        async function loadMessagesForConversation(conversationId) {
+        async function loadMessagesForConversation(conversationId) { /* ... loadMessagesForConversation logic ... */
             if (!conversationId) {
-                // console.log("loadMessagesForConversation called with no ID, clearing chatbox.");
                 chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或选择一个已有对话。</p>';
                 return;
             }
-            // console.log(`Workspaceing messages for conversation ${conversationId}`);
             chatBox.innerHTML = '<p style="text-align:center; color:#777;">正在加载聊天记录...</p>';
             try {
-                const url = `/chat/messages/${conversationId}/`; // Construct URL carefully
+                const url = `/chat/messages/${conversationId}/`; 
                 const response = await fetch(url, { headers: { 'X-CSRFToken': getCookie('csrftoken') } });
                 if (!response.ok) { const errorText = await response.text(); throw new Error(`获取消息失败 (${response.status}): ${errorText}`); }
                 const data = await response.json(); 
@@ -440,14 +476,13 @@
                 chatBox.innerHTML = `<p style="text-align:center; color:var(--error-text);">加载聊天记录失败: ${error.message}</p>`;
             } finally { scrollToBottom(); }
         }
-        
-        function deleteConversation(conversationIdToDelete, isClearingChat = false) {
+        function deleteConversation(conversationIdToDelete, isClearingChat = false) { /* ... deleteConversation logic ... */
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) { showError('CSRF Token 缺失'); return; }
 
             if (!isClearingChat && !confirm(`确定要永久删除这个对话吗？此操作无法撤销。`)) { return; }
 
-            fetch(`/chat/delete/${conversationIdToDelete}/`, { // Manually construct URL
+            fetch(`/chat/delete/${conversationIdToDelete}/`, { 
                 method: 'POST', headers: { 'X-CSRFToken': csrftoken }
             })
                 .then(response => response.json())
@@ -463,8 +498,7 @@
                 .catch(err => { console.error('删除对话错误:', err); showError(`删除对话失败: ${err.message}`); });
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // console.log("DOM Content Loaded. Initial currentConversationId from Django:", currentConversationId);
+        document.addEventListener('DOMContentLoaded', () => { /* ... DOMContentLoaded logic ... */
             if (currentConversationId) { 
                 loadMessagesForConversation(currentConversationId);
             } else {
@@ -473,5 +507,7 @@
             updateSidebar(); 
         });
     </script>
+</body>
+</html>
 </body>
 </html>
