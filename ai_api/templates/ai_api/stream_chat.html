@@ -204,6 +204,7 @@
             const question = userInput.value.trim();
             const model = document.getElementById('model-select').value;
             if (!question) return;
+            let firstChunk = true;
 
             sendBtn.disabled = true; sendBtn.textContent = '思考中';
             userInput.value = ''; userInput.style.height = 'auto';
@@ -247,7 +248,6 @@
                 const decoder = new TextDecoder();
                 let buffer = '';
                 let currentContent = '';
-                let firstChunk = true;
                 let rawDataForDoneCheck = '';
                 let eol;
                 // console.log("Starting stream processing. Initial currentConversationId:", currentConversationId);
