@@ -52,7 +52,7 @@
         #error-message { background-color: var(--error-bg); color: var(--error-text); padding: 0.8rem 1.2rem; margin: 0.5rem 1.5rem; border-radius: 6px; display: none; justify-content: space-between; align-items: center; font-size: 0.9rem; }
         #error-message .close-btn { background: none; border: none; color: var(--error-text); font-size: 1.2rem; cursor: pointer; padding: 0 0.5rem; }
         #chat-box { flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--bg-color); scroll-behavior: smooth; position: relative; }
-        .message { margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px; max-width: 80%; line-height: 1.6; box-shadow: 0 1px 3px rgba(0,0,0,0.08); white-space: pre-wrap; /* Ensure whitespace is preserved for textContent */ }
+        .message { margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px; max-width: 80%; line-height: 1.6; box-shadow: 0 1px 3px rgba(0,0,0,0.08); white-space: pre-wrap; }
         .message strong { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem; }
         .user-message { background: var(--user-msg-bg); color: #1f5c3b; margin-left: auto; border-bottom-right-radius: 0; }
         .ai-message { background: var(--ai-msg-bg); color: #721c24; margin-right: auto; border-bottom-left-radius: 0; }
@@ -216,9 +216,11 @@
 
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'message ai-message';
-            aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content">思考中...</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
+            // Initialize with a placeholder for content, but it will be managed by streaming logic
+            aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content"></div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
             const aiMessageContentDiv = aiMsgDiv.querySelector('.message-content');
             const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
+            aiMessageContentDiv.textContent = '思考中...'; // Initial text
             chatBox.appendChild(aiMsgDiv);
             autoScroll();
 
@@ -227,6 +229,7 @@
 
             let isNewConversationAtStart = !currentConversationId; 
             let tempStreamConvId = null; 
+            let accumulatedContent = ''; // Accumulate content for typewriter effect
 
             console.log("Sending to backend:", { question, model, conversation_id: currentConversationId }); // 日志2
             try {
@@ -246,10 +249,15 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let currentContent = ''; 
+                // currentContent is now accumulatedContent
                 let rawDataForDoneCheck = '';
                 let eol;
                 console.log("Starting stream processing. isNewConversationAtStart:", isNewConversationAtStart); // 日志3
+
+                // Clear "思考中..." for streaming
+                if (firstChunk) {
+                    aiMessageContentDiv.textContent = '';
+                }
 
                 while (true) { 
                     const { done, value } = await reader.read();
@@ -264,11 +272,10 @@
                                 try {
                                     const data = JSON.parse(rawDataForDoneCheck);
                                     if (data.content) {
-                                        if (firstChunk) { currentContent = data.content; firstChunk = false; } 
-                                        else { currentContent += data.content; }
-                                        // TEMPORARY: Use textContent for streaming test
-                                        aiMessageContentDiv.textContent = currentContent; 
-                                        // aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); // Original line
+                                        if (firstChunk) { accumulatedContent = data.content; firstChunk = false; } 
+                                        else { accumulatedContent += data.content; }
+                                        // Update with textContent for potentially smoother partial updates
+                                        aiMessageContentDiv.textContent = accumulatedContent; 
                                         console.log("Updated AI message with final buffered chunk (textContent):", data.content); // 日志12a
                                     }
                                     if (data.conversation_id && isNewConversationAtStart && !tempStreamConvId) {
@@ -307,28 +314,27 @@
                                 }
 
                                 if (data.error) { 
-                                    currentContent = `错误: ${data.error}`; 
+                                    accumulatedContent = `错误: ${data.error}`; 
                                     showError(data.error); 
                                     rawDataForDoneCheck = '[DONE]'; 
                                     break; 
                                 } else if (data.content) {
                                     if (firstChunk) { 
-                                        currentContent = data.content; 
+                                        accumulatedContent = data.content; 
+                                        aiMessageContentDiv.textContent = ''; // Clear "思考中..." if it's the very first actual content
                                         firstChunk = false; 
                                     } else { 
-                                        currentContent += data.content; 
+                                        accumulatedContent += data.content; 
                                     }
-                                    // TEMPORARY: Use textContent for streaming test
-                                    aiMessageContentDiv.textContent = currentContent;
-                                    // aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); // Original line
+                                    // Update with textContent for potentially smoother partial updates
+                                    aiMessageContentDiv.textContent = accumulatedContent;
                                     console.log("Updated AI message content with chunk (textContent):", data.content); // 日志12
+                                    await new Promise(resolve => requestAnimationFrame(resolve)); // Give browser time to render
                                 }
                             } catch (e) { 
                                 console.error('解析流数据错误:', rawDataForDoneCheck, e); 
-                                currentContent += "\n[数据解析错误]"; 
-                                // TEMPORARY: Use textContent for streaming test
-                                aiMessageContentDiv.textContent = currentContent;
-                                // aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); // Original line
+                                accumulatedContent += "\n[数据解析错误]"; 
+                                aiMessageContentDiv.textContent = accumulatedContent;
                             }
                         }
                     } 
@@ -339,11 +345,9 @@
                 } 
                 console.log("Exited stream processing loop. Final tempStreamConvId:", tempStreamConvId); // 日志14
                 
-                // After loop, if using textContent, ensure final content is rendered with Markdown
-                if (aiMessageContentDiv.textContent === currentContent && currentContent !== "") { // Check if textContent was used
-                    console.log("Re-rendering final content with Markdown.");
-                    aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
-                }
+                // Final rendering with Markdown after the stream is complete
+                console.log("Applying final Markdown rendering to accumulated content.");
+                aiMessageContentDiv.innerHTML = renderMarkdown(accumulatedContent);
 
 
                 if (isNewConversationAtStart && tempStreamConvId) {
@@ -352,9 +356,16 @@
                     history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
                 }
 
-                if (rawDataForDoneCheck === '[DONE]' && firstChunk && currentContent === '') { aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。"); }
-                else if (currentContent === "" && !firstChunk) { aiMessageContentDiv.innerHTML = renderMarkdown("AI响应为空。"); }
-                else if (currentContent === "" && aiMessageContentDiv.textContent.includes('思考中...')) { aiMessageContentDiv.innerHTML = renderMarkdown("AI未响应或响应超时。");}
+                // Check final state for empty messages (already handled by Markdown rendering if accumulatedContent is empty)
+                if (rawDataForDoneCheck === '[DONE]' && firstChunk && accumulatedContent === '') { 
+                     // This means [DONE] was received, but no content chunks ever came.
+                     // renderMarkdown('') will result in an empty div, which is fine.
+                     // If "思考中..." was never cleared, it means no content at all.
+                    if (aiMessageContentDiv.textContent.includes('思考中...')) { // Check if "思考中..." is still there
+                         aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
+                    }
+                }
+
 
             } catch (error) {
                 console.error('请求错误:', error);
@@ -364,12 +375,12 @@
                 sendBtn.disabled = false; sendBtn.textContent = '发送';
                 aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
                 autoScroll(); 
-                if (firstChunk && currentContent === '' && aiMessageContentDiv.textContent.includes('思考中...')) { 
-                    aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，无有效内容。"); 
-                }
+                // The firstChunk check here might be redundant if the main loop handles empty content correctly
+                // if (firstChunk && accumulatedContent === '' && aiMessageContentDiv.textContent.includes('思考中...')) { 
+                //     aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，无有效内容。"); 
+                // }
                 
                 let needsSidebarUpdate = false;
-                // Update sidebar ONLY if a new conversation was successfully established in THIS sendMessage call
                 if (isNewConversationAtStart && currentConversationId && tempStreamConvId === currentConversationId) { 
                     needsSidebarUpdate = true;
                     console.log("Sidebar update needed: New conversation ID fully established.", currentConversationId);
@@ -399,8 +410,6 @@
         }
         function startNewConversation() {
             currentConversationId = null;
-            // isNewConversationInternal = true; // This variable is local to sendMessage
-            // tempStreamConvId = null; 
             chatBox.innerHTML = ''; 
             userInput.value = ''; userInput.style.height = 'auto';
             hideError();
