@@ -124,10 +124,9 @@
         const conversationList = document.getElementById('conversation-list');
 
         let isUserScrolling = false;
-        // let lastSidebarUpdate = 0; // Not currently used with debounce logic
         const sidebarUpdateDebounce = 1000;
 
-        if (currentConversationId === '' || currentConversationId === 'None') {
+        if (currentConversationId === '' || currentConversationId === 'None' || currentConversationId === 'undefined') {
             currentConversationId = null;
         }
 
@@ -226,15 +225,15 @@
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) { console.error('CSRF token not found'); showError('CSRF Token 缺失'); sendBtn.disabled = false; sendBtn.textContent = '发送'; aiMessageContentDiv.textContent = '请求准备失败。'; return; }
 
-            let isNewConversationInternal = !currentConversationId; // True if currentConversationId is null at the start of this function call
-            let tempCurrentConversationIdDuringStream = currentConversationId; // Will hold the ID for *this* stream
+            let isNewConversationInternal = !currentConversationId; // True if currentConversationId is null at the start
+            let tempCurrentConversationIdFromStream = null; // To store ID if received from stream
 
-            console.log("Sending to backend:", { question, model, conversation_id: tempCurrentConversationIdDuringStream }); // 日志2
+            console.log("Sending to backend:", { question, model, conversation_id: currentConversationId }); // 日志2
             try {
                 const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-                    body: JSON.stringify({ question, model, conversation_id: tempCurrentConversationIdDuringStream }) // Send current ID (or null if new)
+                    body: JSON.stringify({ question, model, conversation_id: currentConversationId }) 
                 });
 
                 if (!response.ok) {
@@ -247,12 +246,12 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let currentContent = ''; // Accumulates AI's response content for the current message
+                let currentContent = ''; 
                 let rawDataForDoneCheck = '';
                 let eol;
-                console.log("Starting stream processing. Initial tempCurrentConversationIdDuringStream:", tempCurrentConversationIdDuringStream); // 日志3
+                console.log("Starting stream processing. isNewConversationInternal:", isNewConversationInternal); // 日志3
 
-                while (true) { // Outer loop for reading stream chunks
+                while (true) { 
                     const { done, value } = await reader.read();
                     console.log(`Stream outer loop: done = ${done}, value received = ${value ? value.byteLength : 0} bytes`); // 日志4
 
@@ -268,11 +267,11 @@
                                         if (firstChunk) { currentContent = data.content; firstChunk = false; } 
                                         else { currentContent += data.content; }
                                         aiMessageContentDiv.innerHTML = renderMarkdown(currentContent);
+                                        console.log("Updated AI message with final buffered chunk:", data.content); // 日志12a
                                     }
-                                    if (data.conversation_id && isNewConversationInternal) {
-                                        tempCurrentConversationIdDuringStream = data.conversation_id;
-                                        isNewConversationInternal = false; 
-                                        console.log("New conversation ID from final stream data (temp):", tempCurrentConversationIdDuringStream); // 日志11a
+                                    if (data.conversation_id && isNewConversationInternal && !tempCurrentConversationIdFromStream) {
+                                        tempCurrentConversationIdFromStream = data.conversation_id;
+                                        console.log("New conversation ID from final stream data (temp):", tempCurrentConversationIdFromStream); // 日志11a
                                     }
                                 } catch (e) { console.warn('Error parsing final chunk:', rawDataForDoneCheck, e); }
                             }
@@ -283,7 +282,7 @@
                     buffer += decoder.decode(value, { stream: true });
                     console.log(`Buffer content now (length ${buffer.length}): "${buffer}"`); // 日志6
                     
-                    while ((eol = buffer.indexOf('\n\n')) >= 0) { // Inner loop for processing complete SSE messages
+                    while ((eol = buffer.indexOf('\n\n')) >= 0) { 
                         const line = buffer.substring(0, eol).trim();
                         buffer = buffer.substring(eol + 2);
                         console.log(`Processing line from buffer: "${line}"`); // 日志7
@@ -300,17 +299,16 @@
                                 const data = JSON.parse(rawDataForDoneCheck);
                                 console.log("Parsed JSON data from line:", data); // 日志10
 
-                                if (data.conversation_id && isNewConversationInternal) {
-                                    tempCurrentConversationIdDuringStream = data.conversation_id;
-                                    isNewConversationInternal = false; 
-                                    console.log("New conversation ID from stream data (temp):", tempCurrentConversationIdDuringStream); // 日志11b
+                                if (data.conversation_id && isNewConversationInternal && !tempCurrentConversationIdFromStream) {
+                                    tempCurrentConversationIdFromStream = data.conversation_id;
+                                    console.log("New conversation ID from stream data (temp):", tempCurrentConversationIdFromStream); // 日志11b
                                 }
 
                                 if (data.error) { 
                                     currentContent = `错误: ${data.error}`; 
                                     showError(data.error); 
-                                    rawDataForDoneCheck = '[DONE]'; // Attempt to stop further processing
-                                    break; // Break inner loop
+                                    rawDataForDoneCheck = '[DONE]'; 
+                                    break; 
                                 } else if (data.content) {
                                     if (firstChunk) { 
                                         currentContent = data.content; 
@@ -321,7 +319,6 @@
                                     aiMessageContentDiv.innerHTML = renderMarkdown(currentContent); 
                                     console.log("Updated AI message content with chunk:", data.content); // 日志12
                                 }
-                                // autoScroll(); // Moved to finally for less frequent calls
                             } catch (e) { 
                                 console.error('解析流数据错误:', rawDataForDoneCheck, e); 
                                 currentContent += "\n[数据解析错误]"; 
@@ -334,17 +331,13 @@
                         break; 
                     }
                 } 
-                console.log("Exited stream processing loop. Final tempCurrentConversationIdDuringStream:", tempCurrentConversationIdDuringStream); // 日志14
+                console.log("Exited stream processing loop. Final tempCurrentConversationIdFromStream:", tempCurrentConversationIdFromStream); // 日志14
                 
-                // Final update of global currentConversationId and history IF a new ID was established
-                if (tempCurrentConversationIdDuringStream && (!currentConversationId || currentConversationId !== tempCurrentConversationIdDuringStream) ) {
-                    if (!currentConversationId) { // It was definitely a new conversation
-                         currentConversationId = tempCurrentConversationIdDuringStream;
-                         console.log("Global currentConversationId updated to (was null):", currentConversationId);
-                         history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
-                    }
+                if (isNewConversationInternal && tempCurrentConversationIdFromStream) {
+                    currentConversationId = tempCurrentConversationIdFromStream;
+                    console.log("Global currentConversationId updated to (was new):", currentConversationId); // 日志15
+                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
                 }
-
 
                 if (rawDataForDoneCheck === '[DONE]' && firstChunk && currentContent === '') { aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。"); }
                 else if (currentContent === "" && !firstChunk) { aiMessageContentDiv.innerHTML = renderMarkdown("AI响应为空。"); }
@@ -364,9 +357,14 @@
                 
                 let needsSidebarUpdate = false;
                 if (currentConversationId) { 
-                    if (document.querySelector(`#conversation-list li[data-conversation-id="${currentConversationId}"]`) === null) {
+                    // If isNewConversationInternal was true at the start AND currentConversationId is now set (meaning it was set in this call)
+                    if (isNewConversationInternal && tempCurrentConversationIdFromStream === currentConversationId) { 
                         needsSidebarUpdate = true;
-                        console.log("Sidebar update needed: New conv ID or not yet in list.", currentConversationId);
+                        console.log("Sidebar update needed: New conversation ID established.", currentConversationId);
+                    } else if (document.querySelector(`#conversation-list li[data-conversation-id="${currentConversationId}"]`) === null) {
+                        // Fallback: if ID is set but not in list (e.g. page reloaded into existing chat not yet in sidebar)
+                        needsSidebarUpdate = true;
+                        console.log("Sidebar update needed: Conv ID set but not in list.", currentConversationId);
                     }
                 }
                 if (needsSidebarUpdate) {
@@ -410,14 +408,15 @@
             }, sidebarUpdateDebounce);
         }
         function updateSidebar() {
-            // console.log("Attempting to update sidebar. Current active ID:", currentConversationId);
+            console.log("Attempting to update sidebar. Current active ID:", currentConversationId); // 日志 S1
             fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } }) 
                 .then(response => { if (!response.ok) throw new Error('获取对话列表失败 ' + response.status); return response.json(); })
                 .then(data => {
-                    // console.log("Sidebar data received:", data.conversations);
+                    console.log("Sidebar data received:", data.conversations); // 日志 S2
                     conversationList.innerHTML = ''; 
                     if (data.conversations && data.conversations.length > 0) {
                         data.conversations.forEach(conv => {
+                            console.log(`Sidebar: Processing conv ID=${conv.id}, Title='${conv.title}'`); // 日志 S3
                             const li = document.createElement('li');
                             li.dataset.conversationId = conv.id;
                             if (conv.id.toString() === currentConversationId) {
@@ -438,6 +437,8 @@
                             };
                             conversationList.appendChild(li);
                         });
+                    } else {
+                        console.log("No conversations to display in sidebar."); // 日志 S4
                     }
                 })
                 .catch(err => { console.error('侧边栏更新错误:', err); });
@@ -447,13 +448,14 @@
                 chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或选择一个已有对话。</p>';
                 return;
             }
-            // console.log(`Fetching messages for conversation ${conversationId}`);
+            console.log(`Fetching messages for conversation ${conversationId}`); // 日志 L1
             chatBox.innerHTML = '<p style="text-align:center; color:#777;">正在加载聊天记录...</p>';
             try {
                 const url = `/chat/messages/${conversationId}/`; 
                 const response = await fetch(url, { headers: { 'X-CSRFToken': getCookie('csrftoken') } });
                 if (!response.ok) { const errorText = await response.text(); throw new Error(`获取消息失败 (${response.status}): ${errorText}`); }
                 const data = await response.json(); 
+                console.log("Messages loaded for conversation:", data.messages ? data.messages.length : 0); // 日志 L2
                 chatBox.innerHTML = ''; 
                 if (data.messages && data.messages.length > 0) {
                     data.messages.forEach(msg => {
@@ -492,7 +494,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            console.log("DOM Content Loaded. Initial currentConversationId from Django:", currentConversationId);
+            console.log("DOM Content Loaded. Initial currentConversationId from Django:", currentConversationId); // 日志 D1
             if (currentConversationId) { 
                 loadMessagesForConversation(currentConversationId);
             } else {
