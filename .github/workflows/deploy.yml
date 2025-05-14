@@ -11,45 +11,86 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3 # Updated to v3
+      uses: actions/checkout@v3
 
     - name: Set up SSH
-      uses: webfactory/ssh-agent@v0.7.0 # Updated to v0.7.0
+      uses: webfactory/ssh-agent@v0.7.0
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Deploy to Server via SSH
+      env: # 定义环境变量，以便在EOF块中使用
+        PROJECT_DIR: "~/ai_project"
+        GUNICORN_APP: "ai_site.wsgi:application"
+        GUNICORN_BIND_ADDRESS: "127.0.0.1:8001"
+        GUNICORN_WORKER_CLASS: "sync"
+        GUNICORN_WORKERS: "3"
+        GUNICORN_TIMEOUT: "180"
+        GUNICORN_LOG_LEVEL: "debug"
+        GUNICORN_CAPTURE_LOG_FILE: "~/ai_project/gunicorn_capture.log"
+        GUNICORN_ERROR_LOG_FILE: "~/ai_project/gunicorn_error.log"
+        GUNICORN_ACCESS_LOG_FILE: "~/ai_project/gunicorn_access.log"
+
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
-          # 进入项目目录
-          cd ~/ai_project || exit
-          
-          # 拉取最新代码
-          echo "🔄 正在从 GitHub 拉取最新代码..."
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} "bash -s" << EOF
+          # 使用 'bash -s' 可以在这里安全地使用变量
+          set -e # 如果任何命令失败，则立即退出
+          echo "--- 进入项目目录 ---"
+          cd "$PROJECT_DIR" || { echo "错误：无法进入项目目录 $PROJECT_DIR"; exit 1; }
+          pwd
+
+          echo "--- 从 GitHub 拉取最新代码 ---"
           git reset --hard HEAD
-          git pull origin main
+          git pull origin main --no-rebase
 
-          # 查找并关闭占用端口 8001 的进程
-          echo "🛑 查找并关闭占用端口 8001 的进程..."
-          PIDS=$(lsof -t -i:8001)
-          if [ -n "$PIDS" ]; then
-            echo "Killing PIDS: $PIDS"
-            kill -9 $PIDS # Ensure PIDS is quoted
-            echo "✅ 已关闭进程: $PIDS"
+          echo "--- 查找并关闭占用端口 8001 的进程 ---"
+          PORT_TO_CHECK=\$(echo "$GUNICORN_BIND_ADDRESS" | cut -d':' -f2)
+          PIDS=\$(lsof -t -i:\$PORT_TO_CHECK || true) # '|| true' 防止lsof找不到时脚本退出
+          if [ -n "\$PIDS" ]; then
+            echo "发现占用端口的进程: \$PIDS。尝试关闭..."
+            kill -9 \$PIDS || echo "Kill命令可能失败 (进程已不存在?)"
+            sleep 3
+            # 再次检查
+            PIDS_AFTER=\$(lsof -t -i:\$PORT_TO_CHECK || true)
+            if [ -n "\$PIDS_AFTER" ]; then
+                echo "端口仍然被占用 (\$PIDS_AFTER)。尝试 pkill..."
+                pkill -9 -f "gunicorn.*${GUNICORN_APP}.*${GUNICORN_BIND_ADDRESS}" || echo "pkill 未找到匹配进程或失败"
+                sleep 5
+                PIDS_FINAL=\$(lsof -t -i:\$PORT_TO_CHECK || true)
+                if [ -n "\$PIDS_FINAL" ]; then
+                    echo "❌ 错误：无法释放端口 \$PORT_TO_CHECK。当前占用进程: \$PIDS_FINAL"
+                    exit 1
+                fi
+            fi
           else
-            echo "✅ 没有占用端口 8001 的进程"
+            echo "✅ 端口 \$PORT_TO_CHECK 没有被占用。"
           fi
+          echo "✅ 端口检查和清理完成。"
 
-          # 启动 gunicorn 后台运行
-          echo "🚀 启动新的 Gunicorn 进程..."
-          source ~/ai_project/venv/bin/activate
-          # 明确设置 --timeout (例如 180 秒) 和 --workers (例如 3)
-          nohup gunicorn ai_site.wsgi:application \
-              --bind 127.0.0.1:8001 \
-              --workers 3 \
-              --timeout 180 \
-              --worker-class sync > gunicorn.log 2>&1 &
+          echo "--- 启动新的 Gunicorn 进程 ---"
+          source "${PROJECT_DIR}/venv/bin/activate"
+
+          GUNICORN_COMMAND="nohup gunicorn \${GUNICORN_APP} \
+              --bind \${GUNICORN_BIND_ADDRESS} \
+              --workers \${GUNICORN_WORKERS} \
+              --timeout \${GUNICORN_TIMEOUT} \
+              --worker-class \${GUNICORN_WORKER_CLASS} \
+              --log-level \${GUNICORN_LOG_LEVEL} \
+              --access-logfile \${GUNICORN_ACCESS_LOG_FILE} \
+              --error-logfile \${GUNICORN_ERROR_LOG_FILE} > \${GUNICORN_CAPTURE_LOG_FILE} 2>&1 &"
           
-          echo "✅ 部署完成！Gunicorn 后台运行中！日志在 gunicorn.log"
-          echo "Gunicorn command used: nohup gunicorn ai_site.wsgi:application --bind 127.0.0.1:8001 --workers 3 --timeout 180 --worker-class sync > gunicorn.log 2>&1 &"
+          echo "执行: \$GUNICORN_COMMAND"
+          eval "\$GUNICORN_COMMAND" # 使用eval来正确处理包含变量和重定向的命令字符串
+          
+          sleep 5 # 等待Gunicorn启动
+
+          if lsof -Pi TCP:\$PORT_TO_CHECK -sTCP:LISTEN -t > /dev/null ; then
+            echo "✅ 部署完成！Gunicorn 后台运行中！"
+            echo "Gunicorn 监听在: http://\${GUNICORN_BIND_ADDRESS}"
+            echo "Gunicorn 错误日志 (包含Django日志): \${GUNICORN_ERROR_LOG_FILE}"
+          else
+            echo "❌ 错误：Gunicorn 似乎没有成功启动或监听端口 \${PORT_TO_CHECK}。"
+            echo "请检查日志文件: \${GUNICORN_ERROR_LOG_FILE} 和 \${GUNICORN_CAPTURE_LOG_FILE}"
+            exit 1 # 如果Gunicorn启动失败，则标记部署失败
+          fi
         EOF
