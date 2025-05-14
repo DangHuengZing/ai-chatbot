@@ -10,3 +10,7 @@
 ```bash
 git clone https://github.com/DangHuengZing/ai-chatbot.git
 cd ai-chatbot
+
+
+
+echo "🔍 实时查看 Gunicorn 日志：sudo journalctl -u gunicorn -e -f"
