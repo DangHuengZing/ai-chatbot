@@ -19,7 +19,7 @@ jobs:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Deploy to Server via SSH
-      env: # 定义环境变量，以便在EOF块中使用
+      env:
         PROJECT_DIR: "~/ai_project"
         GUNICORN_APP: "ai_site.wsgi:application"
         GUNICORN_BIND_ADDRESS: "127.0.0.1:8001"
@@ -27,30 +27,35 @@ jobs:
         GUNICORN_WORKERS: "3"
         GUNICORN_TIMEOUT: "180"
         GUNICORN_LOG_LEVEL: "debug"
-        GUNICORN_CAPTURE_LOG_FILE: "~/ai_project/gunicorn_capture.log"
+        GUNICORN_CAPTURE_LOG_FILE: "~/ai_project/gunicorn_stdout_stderr.log" # 对应修改
         GUNICORN_ERROR_LOG_FILE: "~/ai_project/gunicorn_error.log"
         GUNICORN_ACCESS_LOG_FILE: "~/ai_project/gunicorn_access.log"
 
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} "bash -s" << EOF
-          # 使用 'bash -s' 可以在这里安全地使用变量
-          set -e # 如果任何命令失败，则立即退出
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} "bash -s" << 'EOF'
+          set -e 
           echo "--- 进入项目目录 ---"
           cd "$PROJECT_DIR" || { echo "错误：无法进入项目目录 $PROJECT_DIR"; exit 1; }
           pwd
 
           echo "--- 从 GitHub 拉取最新代码 ---"
+          current_branch=\$(git rev-parse --abbrev-ref HEAD)
+          if [ "\$current_branch" != "main" ]; then
+              echo "⚠️ 当前不在 main 分支 (\${current_branch})，正在切换到 main 分支..."
+              git checkout main || { echo "❌ 切换到 main 分支失败"; exit 1; }
+          fi
           git reset --hard HEAD
-          git pull origin main --no-rebase
+          git fetch origin
+          git reset --hard origin/main
+          echo "✅ 代码同步完成。"
 
           echo "--- 查找并关闭占用端口 8001 的进程 ---"
           PORT_TO_CHECK=\$(echo "$GUNICORN_BIND_ADDRESS" | cut -d':' -f2)
-          PIDS=\$(lsof -t -i:\$PORT_TO_CHECK || true) # '|| true' 防止lsof找不到时脚本退出
+          PIDS=\$(lsof -t -i:\$PORT_TO_CHECK || true) 
           if [ -n "\$PIDS" ]; then
             echo "发现占用端口的进程: \$PIDS。尝试关闭..."
-            kill -9 \$PIDS || echo "Kill命令可能失败 (进程已不存在?)"
+            kill -9 \$PIDS || echo "Kill命令可能失败"
             sleep 3
-            # 再次检查
             PIDS_AFTER=\$(lsof -t -i:\$PORT_TO_CHECK || true)
             if [ -n "\$PIDS_AFTER" ]; then
                 echo "端口仍然被占用 (\$PIDS_AFTER)。尝试 pkill..."
@@ -80,17 +85,16 @@ jobs:
               --error-logfile \${GUNICORN_ERROR_LOG_FILE} > \${GUNICORN_CAPTURE_LOG_FILE} 2>&1 &"
           
           echo "执行: \$GUNICORN_COMMAND"
-          eval "\$GUNICORN_COMMAND" # 使用eval来正确处理包含变量和重定向的命令字符串
+          eval "\$GUNICORN_COMMAND" 
           
-          sleep 5 # 等待Gunicorn启动.
+          sleep 5 
 
           if lsof -Pi TCP:\$PORT_TO_CHECK -sTCP:LISTEN -t > /dev/null ; then
             echo "✅ 部署完成！Gunicorn 后台运行中！"
-            echo "Gunicorn 监听在: http://\${GUNICORN_BIND_ADDRESS}"
             echo "Gunicorn 错误日志 (包含Django日志): \${GUNICORN_ERROR_LOG_FILE}"
           else
             echo "❌ 错误：Gunicorn 似乎没有成功启动或监听端口 \${PORT_TO_CHECK}。"
             echo "请检查日志文件: \${GUNICORN_ERROR_LOG_FILE} 和 \${GUNICORN_CAPTURE_LOG_FILE}"
-            exit 1 # 如果Gunicorn启动失败，则标记部署失败.
+            exit 1 
           fi
         EOF
