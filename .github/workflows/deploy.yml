@@ -91,6 +91,6 @@ jobs:
           else
             echo "❌ 错误：Gunicorn 似乎没有成功启动或监听端口 \${PORT_TO_CHECK}。"
             echo "请检查日志文件: \${GUNICORN_ERROR_LOG_FILE} 和 \${GUNICORN_CAPTURE_LOG_FILE}"
-            exit 1 # 如果Gunicorn启动失败，则标记部署失败
+            exit 1 # 如果Gunicorn启动失败，则标记部署失败.
           fi
         EOF
