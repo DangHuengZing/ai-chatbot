@@ -29,16 +29,22 @@ jobs:
           git fetch origin
           git reset --hard origin/main
 
-          echo "--- 重启 Gunicorn 服务 ---"
-          sudo systemctl daemon-reexec
-          sudo systemctl daemon-reload
-          sudo systemctl restart gunicorn
+          echo "--- 停止现有 Gunicorn 服务 ---"
+          PIDS=\$(lsof -t -i:8001 || true)
+          if [ -n "\$PIDS" ]; then
+            kill -9 \$PIDS || echo "kill -9 失败"
+            sleep 3
+          fi
+
+          echo "--- 启动新的 Gunicorn 进程 ---"
+          nohup gunicorn --bind 127.0.0.1:8001 --workers 3 --timeout 180 --worker-class sync --log-level debug --access-logfile /root/ai_project/gunicorn_access.log --error-logfile /root/ai_project/gunicorn_error.log > /root/ai_project/gunicorn_stdout_stderr.log 2>&1 &
 
           sleep 3
-          if systemctl is-active --quiet gunicorn; then
-            echo "✅ 部署完成！Gunicorn 正在运行"
+
+          if lsof -Pi TCP:8001 -sTCP:LISTEN -t > /dev/null ; then
+            echo "✅ 部署完成！Gunicorn 启动成功！"
           else
-            echo "❌ Gunicorn 启动失败，建议使用 sudo journalctl -u gunicorn -e 查看原因"
+            echo "❌ Gunicorn 启动失败。查看日志文件：/root/ai_project/gunicorn_error.log 和 /root/ai_project/gunicorn_stdout_stderr.log"
             exit 1
           fi
         EOF
