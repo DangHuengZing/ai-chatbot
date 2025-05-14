@@ -19,78 +19,26 @@ jobs:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
     - name: Deploy to Server via SSH
-      env:
-        PROJECT_DIR: "~/ai_project"
-        VENV_ACTIVATE_PATH: "~/ai_project/venv/bin/activate"
-        GUNICORN_APP: "ai_site.wsgi:application"
-        GUNICORN_BIND_ADDRESS: "127.0.0.1:8001"
-        GUNICORN_PORT: "8001"
-        GUNICORN_WORKERS: "3"
-        GUNICORN_TIMEOUT: "180"
-        GUNICORN_WORKER_CLASS: "sync"
-        GUNICORN_LOG_LEVEL: "debug"
-        GUNICORN_ACCESS_LOG_FILE: "~/ai_project/gunicorn_access.log"
-        GUNICORN_ERROR_LOG_FILE: "~/ai_project/gunicorn_error.log"
-        GUNICORN_CAPTURE_LOG_FILE: "~/ai_project/gunicorn_stdout_stderr.log"
-
       run: |
-        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} "bash -s" << 'EOF'
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SERVER_IP }} << 'EOF'
           set -e
-          echo "--- 进入项目目录 ---"
-          cd "$PROJECT_DIR" || { echo "❌ 无法进入 $PROJECT_DIR"; exit 1; }
-          pwd
+          cd ~/ai_project || { echo "❌ 项目目录不存在"; exit 1; }
 
-          echo "--- Git 拉取更新 ---"
-          current_branch=\$(git rev-parse --abbrev-ref HEAD)
-          if [ "\$current_branch" != "main" ]; then
-            git checkout main || { echo "❌ 切换到 main 分支失败"; exit 1; }
-          fi
+          echo "--- 拉取 Git 最新代码 ---"
           git reset --hard HEAD
           git fetch origin
           git reset --hard origin/main
-          echo "✅ 代码更新完成"
 
-          echo "--- 停止旧 Gunicorn 实例 ---"
-          PORT_TO_CHECK=\$GUNICORN_PORT
-          PIDS=\$(lsof -t -i:\$PORT_TO_CHECK || true)
-          if [ -n "\$PIDS" ]; then
-            echo "尝试 kill -9 \$PIDS"
-            kill -9 \$PIDS || echo "kill -9 失败"
-            sleep 3
-          fi
+          echo "--- 重启 Gunicorn 服务 ---"
+          sudo systemctl daemon-reexec
+          sudo systemctl daemon-reload
+          sudo systemctl restart gunicorn
 
-          echo "🔍 查杀残留 gunicorn 进程..."
-          ps aux | grep gunicorn | grep -v grep | awk '{print \$2}' | xargs -r kill -9 || echo "无残留 gunicorn 进程"
           sleep 3
-
-          REMAINING=\$(lsof -t -i:\$PORT_TO_CHECK || true)
-          if [ -n "\$REMAINING" ]; then
-            echo "❌ 端口 \$PORT_TO_CHECK 仍被占用: \$REMAINING"
-            exit 1
-          fi
-
-          echo "--- 启动 Gunicorn ---"
-          source "$VENV_ACTIVATE_PATH"
-
-          GUNICORN_COMMAND="nohup gunicorn \${GUNICORN_APP} \
-            --bind \${GUNICORN_BIND_ADDRESS} \
-            --workers \${GUNICORN_WORKERS} \
-            --timeout \${GUNICORN_TIMEOUT} \
-            --worker-class \${GUNICORN_WORKER_CLASS} \
-            --log-level \${GUNICORN_LOG_LEVEL} \
-            --access-logfile \${GUNICORN_ACCESS_LOG_FILE} \
-            --error-logfile \${GUNICORN_ERROR_LOG_FILE} > \${GUNICORN_CAPTURE_LOG_FILE} 2>&1 &"
-
-          echo "执行：\$GUNICORN_COMMAND"
-          eval "\$GUNICORN_COMMAND"
-          sleep 5
-
-          if lsof -Pi TCP:\$PORT_TO_CHECK -sTCP:LISTEN -t > /dev/null ; then
-            echo "✅ 部署完成！Gunicorn 已运行！"
+          if systemctl is-active --quiet gunicorn; then
+            echo "✅ 部署完成！Gunicorn 正在运行"
           else
-            echo "❌ Gunicorn 启动失败！请检查日志："
-            echo "ERROR: \${GUNICORN_ERROR_LOG_FILE}"
-            echo "CAPTURE: \${GUNICORN_CAPTURE_LOG_FILE}"
+            echo "❌ Gunicorn 启动失败，建议使用 sudo journalctl -u gunicorn -e 查看原因"
             exit 1
           fi
         EOF
