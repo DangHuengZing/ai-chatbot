@@ -82,7 +82,7 @@ jobs:
           echo "执行: \$GUNICORN_COMMAND"
           eval "\$GUNICORN_COMMAND" # 使用eval来正确处理包含变量和重定向的命令字符串
           
-          sleep 5 # 等待Gunicorn启动
+          sleep 5 # 等待Gunicorn启动.
 
           if lsof -Pi TCP:\$PORT_TO_CHECK -sTCP:LISTEN -t > /dev/null ; then
             echo "✅ 部署完成！Gunicorn 后台运行中！"
