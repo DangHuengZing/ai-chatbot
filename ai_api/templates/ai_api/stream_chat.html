@@ -144,28 +144,41 @@
         });
 
         function autoScroll() {
+            // This function is now primarily for managing the scroll-to-bottom button
             const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
-            if (isNearBottom && !isUserScrolling) {
-                chatBox.scrollTop = chatBox.scrollHeight;
+            if (isNearBottom) {
                 scrollToBottomBtn.style.display = 'none';
-            } else if (!isNearBottom && chatBox.scrollHeight > chatBox.clientHeight + 50) {
+                // If user was scrolling but reached bottom, allow auto-scroll for next messages
+                // However, sendMessage now directly uses scrollToBottom for new messages.
+                // isUserScrolling = false; 
+            } else if (chatBox.scrollHeight > chatBox.clientHeight + 50) {
                 scrollToBottomBtn.style.display = 'block';
             } else {
                 scrollToBottomBtn.style.display = 'none';
             }
         }
+
         function scrollToBottom() {
+            // console.log("Forcing scroll to bottom");
             chatBox.scrollTop = chatBox.scrollHeight;
             scrollToBottomBtn.style.display = 'none';
-            isUserScrolling = false;
+            isUserScrolling = false; // Reset flag when explicitly scrolling to bottom
         }
+
         let scrollTimeout;
         chatBox.addEventListener('scroll', () => {
-            isUserScrolling = true;
-            clearTimeout(scrollTimeout);
-            scrollTimeout = setTimeout(() => { isUserScrolling = false; }, 300);
-            autoScroll();
+            const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 5;
+            if (!isAtBottom) {
+                isUserScrolling = true; // User has scrolled up
+                // console.log("User is scrolling up.");
+            } else {
+                // If user scrolls back to bottom manually, reset the flag
+                // isUserScrolling = false; 
+                // console.log("User scrolled to bottom manually or near bottom.");
+            }
+            autoScroll(); // Update button visibility
         });
+
 
         function getCookie(name) {
             let cookieValue = null;
@@ -198,10 +211,12 @@
         async function sendMessage() {
             console.log("sendMessage called. currentConversationId at start:", currentConversationId); // 日志1
             const question = userInput.value.trim();
-            const model = document.getElementById('model-select').value;
+            const model = document.getElementById('model-select').value; // Get selected model
+            console.log("Model selected by user in sendMessage:", model); // 日志 M1 - Log selected model
             if (!question) return;
             
             let firstChunk = true; 
+            isUserScrolling = false; // For a new message, assume we want to auto-scroll
 
             sendBtn.disabled = true; sendBtn.textContent = '思考中';
             userInput.value = ''; userInput.style.height = 'auto';
@@ -212,31 +227,30 @@
             const sanitizedQuestion = DOMPurify.sanitize(question, { USE_PROFILES: { html: true } });
             userMsgDiv.innerHTML = `<strong>您:</strong><div class="message-content">${sanitizedQuestion.replace(/\n/g, '<br>')}</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
             chatBox.appendChild(userMsgDiv);
-            autoScroll();
+            scrollToBottom(); 
 
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'message ai-message';
-            // Initialize with a placeholder for content, but it will be managed by streaming logic
             aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content"></div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
             const aiMessageContentDiv = aiMsgDiv.querySelector('.message-content');
             const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
-            aiMessageContentDiv.textContent = '思考中...'; // Initial text
+            aiMessageContentDiv.textContent = '思考中...'; 
             chatBox.appendChild(aiMsgDiv);
-            autoScroll();
+            scrollToBottom(); 
 
             const csrftoken = getCookie('csrftoken');
             if (!csrftoken) { console.error('CSRF token not found'); showError('CSRF Token 缺失'); sendBtn.disabled = false; sendBtn.textContent = '发送'; aiMessageContentDiv.textContent = '请求准备失败。'; return; }
 
             let isNewConversationAtStart = !currentConversationId; 
             let tempStreamConvId = null; 
-            let accumulatedContent = ''; // Accumulate content for typewriter effect
+            let accumulatedContent = ''; 
 
-            console.log("Sending to backend:", { question, model, conversation_id: currentConversationId }); // 日志2
+            console.log("Sending to backend:", { question, model: model, conversation_id: currentConversationId }); // 日志2
             try {
                 const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-                    body: JSON.stringify({ question, model, conversation_id: currentConversationId }) 
+                    body: JSON.stringify({ question, model: model, conversation_id: currentConversationId }) 
                 });
 
                 if (!response.ok) {
@@ -249,14 +263,12 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                // currentContent is now accumulatedContent
                 let rawDataForDoneCheck = '';
                 let eol;
                 console.log("Starting stream processing. isNewConversationAtStart:", isNewConversationAtStart); // 日志3
 
-                // Clear "思考中..." for streaming
-                if (firstChunk) {
-                    aiMessageContentDiv.textContent = '';
+                if (firstChunk) { 
+                    aiMessageContentDiv.textContent = ''; 
                 }
 
                 while (true) { 
@@ -274,9 +286,10 @@
                                     if (data.content) {
                                         if (firstChunk) { accumulatedContent = data.content; firstChunk = false; } 
                                         else { accumulatedContent += data.content; }
-                                        // Update with textContent for potentially smoother partial updates
                                         aiMessageContentDiv.textContent = accumulatedContent; 
                                         console.log("Updated AI message with final buffered chunk (textContent):", data.content); // 日志12a
+                                        scrollToBottom(); // Scroll after update
+                                        await new Promise(resolve => requestAnimationFrame(resolve)); 
                                     }
                                     if (data.conversation_id && isNewConversationAtStart && !tempStreamConvId) {
                                         tempStreamConvId = data.conversation_id;
@@ -321,20 +334,20 @@
                                 } else if (data.content) {
                                     if (firstChunk) { 
                                         accumulatedContent = data.content; 
-                                        aiMessageContentDiv.textContent = ''; // Clear "思考中..." if it's the very first actual content
                                         firstChunk = false; 
                                     } else { 
                                         accumulatedContent += data.content; 
                                     }
-                                    // Update with textContent for potentially smoother partial updates
-                                    aiMessageContentDiv.textContent = accumulatedContent;
+                                    aiMessageContentDiv.textContent = accumulatedContent; 
                                     console.log("Updated AI message content with chunk (textContent):", data.content); // 日志12
-                                    await new Promise(resolve => requestAnimationFrame(resolve)); // Give browser time to render
+                                    scrollToBottom(); // Scroll after update
+                                    await new Promise(resolve => requestAnimationFrame(resolve)); 
                                 }
                             } catch (e) { 
                                 console.error('解析流数据错误:', rawDataForDoneCheck, e); 
                                 accumulatedContent += "\n[数据解析错误]"; 
                                 aiMessageContentDiv.textContent = accumulatedContent;
+                                scrollToBottom(); 
                             }
                         }
                     } 
@@ -345,10 +358,9 @@
                 } 
                 console.log("Exited stream processing loop. Final tempStreamConvId:", tempStreamConvId); // 日志14
                 
-                // Final rendering with Markdown after the stream is complete
-                console.log("Applying final Markdown rendering to accumulated content.");
-                aiMessageContentDiv.innerHTML = renderMarkdown(accumulatedContent);
-
+                console.log("Applying final Markdown rendering to accumulated content:", accumulatedContent); // 日志 M1
+                aiMessageContentDiv.innerHTML = renderMarkdown(accumulatedContent); 
+                scrollToBottom(); // Scroll after final markdown render
 
                 if (isNewConversationAtStart && tempStreamConvId) {
                     currentConversationId = tempStreamConvId; 
@@ -356,16 +368,11 @@
                     history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
                 }
 
-                // Check final state for empty messages (already handled by Markdown rendering if accumulatedContent is empty)
                 if (rawDataForDoneCheck === '[DONE]' && firstChunk && accumulatedContent === '') { 
-                     // This means [DONE] was received, but no content chunks ever came.
-                     // renderMarkdown('') will result in an empty div, which is fine.
-                     // If "思考中..." was never cleared, it means no content at all.
-                    if (aiMessageContentDiv.textContent.includes('思考中...')) { // Check if "思考中..." is still there
+                    if (aiMessageContentDiv.textContent.includes('思考中...') || aiMessageContentDiv.innerHTML === '') {
                          aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
                     }
                 }
-
 
             } catch (error) {
                 console.error('请求错误:', error);
@@ -374,11 +381,7 @@
             } finally {
                 sendBtn.disabled = false; sendBtn.textContent = '发送';
                 aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
-                autoScroll(); 
-                // The firstChunk check here might be redundant if the main loop handles empty content correctly
-                // if (firstChunk && accumulatedContent === '' && aiMessageContentDiv.textContent.includes('思考中...')) { 
-                //     aiMessageContentDiv.innerHTML = renderMarkdown("AI响应结束，无有效内容。"); 
-                // }
+                // scrollToBottom(); // Already called within loop and after markdown render
                 
                 let needsSidebarUpdate = false;
                 if (isNewConversationAtStart && currentConversationId && tempStreamConvId === currentConversationId) { 
@@ -431,14 +434,25 @@
             fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } }) 
                 .then(response => { if (!response.ok) throw new Error('获取对话列表失败 ' + response.status); return response.json(); })
                 .then(data => {
-                    console.log("Sidebar data received:", data.conversations); // 日志 S2
+                    console.log("Sidebar data received (raw):", data); // 日志 S2 
+                    if (!data || !data.conversations) {
+                        console.error("Invalid or missing conversations data from API:", data);
+                        conversationList.innerHTML = '<li>无法加载对话列表。</li>'; 
+                        return;
+                    }
+                    console.log("Sidebar data received (conversations array):", data.conversations); // 日志 S2a 
+
                     conversationList.innerHTML = ''; 
-                    if (data.conversations && data.conversations.length > 0) {
+                    if (data.conversations.length > 0) {
                         data.conversations.forEach(conv => {
+                            if (!conv || typeof conv.id === 'undefined' || typeof conv.title === 'undefined') {
+                                console.warn("Skipping invalid conversation object in sidebar:", conv);
+                                return; 
+                            }
                             console.log(`Sidebar: Processing conv ID=${conv.id}, Title='${conv.title}'`); // 日志 S3
                             const li = document.createElement('li');
                             li.dataset.conversationId = conv.id;
-                            if (conv.id.toString() === currentConversationId) {
+                            if (conv.id && currentConversationId && conv.id.toString() === currentConversationId.toString()) { 
                                 li.classList.add('active');
                             }
                             const sanitizedTitle = DOMPurify.sanitize(conv.title || '无标题对话');
