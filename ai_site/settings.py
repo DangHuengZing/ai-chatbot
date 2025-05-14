@@ -1,5 +1,5 @@
 from pathlib import Path
-import os # 用于环境变量
+import os # 用于环境变量。
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
