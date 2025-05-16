@@ -208,6 +208,57 @@
         }
         function handleKeydown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }
 
+        // 定义全局变量（缓冲队列）
+        let typingQueue = [];
+        let isTyping = false;
+
+        // 标点符号特殊延迟映射
+        const punctuationDelays = {
+            ',': 150,
+            '，': 150,
+            '.': 400,
+            '。': 400,
+            '!': 400,
+            '！': 400,
+            '?': 400,
+            '？': 400,
+            ':': 200,
+            '：': 200,
+            ';': 200,
+            '；': 200
+        };
+
+        // 新数据加入缓冲队列
+        function enqueueTyping(content) {
+            typingQueue.push(...content.split(''));  // 按字符逐个入队
+            processTypingQueue();                    // 启动显示处理
+        }
+
+        // 从缓冲队列中逐个显示字符
+        function processTypingQueue() {
+            if (isTyping) return;  // 正在进行则退出，避免并行执行
+            isTyping = true;
+
+            function typeNext() {
+                 if (typingQueue.length === 0) {
+                     isTyping = false;  // 队列为空，停止执行
+                    return;
+                }
+
+                const nextChar = typingQueue.shift();  // 取出下一个字符
+                aiMessageContentDiv.textContent += nextChar;  // 追加到显示区
+
+                scrollToBottom();  // 每个字符后滚动到最新
+
+                // 根据标点符号选择延迟
+                const delay = punctuationDelays[nextChar] || (Math.random() * 70 + 50);
+
+                setTimeout(typeNext, delay);  // 延迟后继续下一个字符
+            }
+
+            typeNext();
+        }
+
         async function sendMessage() {
             console.log("sendMessage called. currentConversationId at start:", currentConversationId); // 日志1
             const question = userInput.value.trim();
@@ -333,10 +384,7 @@
                                     break; 
                                 } else if (data.content) {
                                     if (firstChunk) { 
-                                        accumulatedContent = data.content; 
-                                        firstChunk = false; 
-                                    } else { 
-                                        accumulatedContent += data.content; 
+                                        enqueueTyping(data.content);  // 替换成调用 enqueueTyping 函数 
                                     }
                                     aiMessageContentDiv.textContent = accumulatedContent; 
                                     console.log("Updated AI message content with chunk (textContent):", data.content); // 日志12
@@ -392,6 +440,9 @@
                 if (needsSidebarUpdate) {
                     debounceUpdateSidebar();
                 }
+            // 当流式数据结束 ([DONE]) 后再进行 markdown 渲染
+            aiMessageContentDiv.innerHTML = renderMarkdown(aiMessageContentDiv.textContent);
+            scrollToBottom();
             }
         }
 
