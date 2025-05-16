@@ -101,7 +101,7 @@ def stream_chat(request):
         messages_for_api = [{'role': 'assistant' if msg.role == 'ai' else msg.role, 'content': msg.content} for msg in reversed(history_qs)] 
         messages_for_api.append({'role': 'user', 'content': question})
 
-        api_model_name = "deepseek-chat" if model_choice == "v3" else "deepseek-coder"
+        api_model_name = "deepseek-chat" if model_choice == "v3" else "deepseek-reasoner"
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json',
