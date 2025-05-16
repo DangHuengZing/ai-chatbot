@@ -2,12 +2,12 @@
 
 import json
 import logging
-import requests # For making HTTP requests to DeepSeek
+import requests
 import uuid
-import time # Import time for more detailed logging if needed
+import time # Ensure time is imported
 from django.conf import settings
 from django.shortcuts import render
-from django.http import JsonResponse, StreamingHttpResponse # Crucial for streaming
+from django.http import JsonResponse, StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import authenticate, login, logout
 from .models import ChatMessage
@@ -51,8 +51,9 @@ def stream_chat_page(request, conversation_id=None):
         'current_conversation_id': str(conversation_id) if conversation_id else ''
     })
 
+
 @login_required
-def stream_chat(request): # Renamed from your previous "stream_chat_api" to match the view name often used
+def stream_chat(request):
     if request.method != 'POST':
         return JsonResponse({'error': 'Only POST allowed'}, status=405)
     try:
@@ -99,38 +100,34 @@ def stream_chat(request): # Renamed from your previous "stream_chat_api" to matc
         messages_for_api = [{'role': 'assistant' if msg.role == 'ai' else msg.role, 'content': msg.content} for msg in reversed(history_qs)]
         messages_for_api.append({'role': 'user', 'content': question})
 
-        api_model_name = "deepseek-chat" # Defaulting to v3 equivalent, adjust if needed based on your model_choice mapping
-        if model_choice == "v3": # Example, adjust if you have more models
+        api_model_name = "deepseek-chat" # Defaulting
+        if model_choice == "v3":
              api_model_name = "deepseek-chat"
-        elif model_choice == "r1": # Assuming r1 is a different model like code/reasoner
-             api_model_name = "deepseek-coder" # Or "deepseek-reasoner" if that's the actual name
-        # Ensure you have a correct mapping for all your model_choice values to DeepSeek model names.
-        # The provided code had "deepseek-reasoner" for r1, which might be an error if you meant a code model.
-        # I've used deepseek-chat for v3 and an example for r1. Please verify.
+        elif model_choice == "r1": # Make sure this matches an actual DeepSeek model name
+             api_model_name = "deepseek-coder" # Example: adjust if it's "deepseek-reasoner" or other
 
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json',
-            'Accept': 'application/json' # Although for SSE, text/event-stream is common, DeepSeek expects JSON and provides SSE in its response.
+            'Accept': 'application/json'
         }
         payload = {
             'model': api_model_name,
             'messages': messages_for_api,
-            'stream': True, # This is crucial for requesting a stream from DeepSeek
+            'stream': True,
         }
 
         logger.debug(f"Sending to DeepSeek API for conv {conversation_id} with model {api_model_name}: {json.dumps(payload, ensure_ascii=False)}")
         api_response = None
         try:
-            # THE CALL TO THE EXTERNAL API (DeepSeek)
             api_response = requests.post(
                 settings.DEEPSEEK_API_URL if hasattr(settings, 'DEEPSEEK_API_URL') else "https://api.deepseek.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                stream=True, # This tells `requests` to stream the response
-                timeout= (15, 180) # (connect_timeout, read_timeout between bytes)
+                stream=True,
+                timeout= (15, 180)
             )
-            api_response.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
+            api_response.raise_for_status()
         except requests.exceptions.Timeout:
             logger.error(f"DeepSeek API request timed out for conv {conversation_id}")
             if api_response: api_response.close()
@@ -142,30 +139,27 @@ def stream_chat(request): # Renamed from your previous "stream_chat_api" to matc
             logger.error(f"DeepSeek API request failed for conv {conversation_id}: {e}")
             if api_response: api_response.close()
             def error_stream_req_exc():
-                yield f"data: {json.dumps({'error': f'API request error: {str(e)}'})}\n\n" # Ensure e is string
+                yield f"data: {json.dumps({'error': f'API request error: {str(e)}'})}\n\n"
                 yield 'data: [DONE]\n\n'
             return StreamingHttpResponse(error_stream_req_exc(), content_type="text/event-stream")
 
-        # GENERATOR FUNCTION FOR STREAMINGRESPONSE
         def event_stream_generator():
             full_ai_content = ""
             sent_conversation_id_in_stream = False
             first_chunk_received = False
             try:
                 logger.info(f"Conv {conversation_id}: Starting event_stream_generator. Waiting for DeepSeek response chunks...")
-                # Iterating over lines from the DeepSeek API response
-                for line_bytes in api_response.iter_lines(): # This iterates as data arrives
+                for line_bytes in api_response.iter_lines():
                     if not first_chunk_received:
                         logger.info(f"Conv {conversation_id}: Received FIRST CHUNK from DeepSeek at {time.strftime('%Y-%m-%d %H:%M:%S%z')}.")
                         first_chunk_received = True
 
-                    if not line_bytes: # Skip keep-alive newlines if any
+                    if not line_bytes:
                         logger.debug(f"Conv {conversation_id}: Skipped empty line_bytes.")
                         continue
 
                     line = line_bytes.decode('utf-8').strip()
                     logger.debug(f"Conv {conversation_id}: Raw line from DeepSeek: '{line}'")
-
 
                     if not line.startswith("data:"):
                         logger.debug(f"Conv {conversation_id}: Line does not start with 'data:', skipping: '{line}'")
@@ -175,7 +169,7 @@ def stream_chat(request): # Renamed from your previous "stream_chat_api" to matc
 
                     if raw_data == '[DONE]':
                         logger.info(f"Conv {conversation_id}: DeepSeek stream [DONE] received. Full AI content length: {len(full_ai_content)}")
-                        if full_ai_content: # Save the complete message
+                        if full_ai_content:
                             ChatMessage.objects.create(
                                 user=request.user,
                                 conversation_id=conversation_id,
@@ -186,11 +180,10 @@ def stream_chat(request): # Renamed from your previous "stream_chat_api" to matc
                             )
                         logger.info(f"Conv {conversation_id}: Yielding [DONE] to client.")
                         yield 'data: [DONE]\n\n'
-                        break # Important to exit the generator loop
+                        break
 
                     try:
                         parsed_chunk = json.loads(raw_data)
-                        # Standard OpenAI/DeepSeek format: choices -> 0 -> delta -> content
                         delta_content = parsed_chunk.get('choices', [{}])[0].get('delta', {}).get('content', '')
 
                         if delta_content:
@@ -200,37 +193,34 @@ def stream_chat(request): # Renamed from your previous "stream_chat_api" to matc
                                 data_to_send['conversation_id'] = str(conversation_id)
                                 sent_conversation_id_in_stream = True
                                 logger.info(f"Conv {conversation_id}: Sent new conversation_id {conversation_id} in stream.")
-
-                            logger.debug(f"Conv {conversation_id}: Yielding content to client: '{delta_content[:50].replaceSENTS_NEWLINE}'...'")
-                            yield f"data: {json.dumps(data_to_send)}\n\n" # YIELDING DATA TO CLIENT
+                            
+                            # CORRECTED LOGGING LINE:
+                            logger.debug(f"Conv {conversation_id}: Yielding content to client: '{delta_content[:50].replaceSENTS_NEWLINE}{delta_content[:50].replace('\n', ' ')}...'") # Replaces newlines with spaces for logging
+                            
+                            yield f"data: {json.dumps(data_to_send)}\n\n"
                         else:
                             logger.debug(f"Conv {conversation_id}: Parsed chunk from DeepSeek, but no delta_content found. Chunk: {parsed_chunk}")
 
-
                     except json.JSONDecodeError:
                         logger.warning(f"Conv {conversation_id}: Invalid JSON in stream: {raw_data}")
-                        # Optionally yield an error to the client, or just log and continue
-                        # yield f"data: {json.dumps({'error': 'Invalid JSON chunk in stream', 'details': raw_data})}\n\n"
-                        continue # Continue to next line from DeepSeek
+                        continue
                     except Exception as e_inner:
                         logger.error(f"Conv {conversation_id}: Error processing DeepSeek stream chunk: {e_inner}", exc_info=True)
-                        yield f"data: {json.dumps({'error': f'Error processing stream chunk: {str(e_inner)}'})}\n\n" # Ensure e is string
-                        # Depending on severity, you might want to break or yield [DONE]
+                        yield f"data: {json.dumps({'error': f'Error processing stream chunk: {str(e_inner)}'})}\n\n"
                         break
-            except requests.exceptions.ChunkedEncodingError as e_chunk: # Error reading from stream
+            except requests.exceptions.ChunkedEncodingError as e_chunk:
                 logger.error(f"Conv {conversation_id}: ChunkedEncodingError during stream: {e_chunk}", exc_info=True)
-                yield f"data: {json.dumps({'error': f'Stream chunk error: {str(e_chunk)}'})}\n\n" # Ensure e is string
-                yield 'data: [DONE]\n\n' # End stream for client
-            except Exception as e_outer: # Other errors during iteration
+                yield f"data: {json.dumps({'error': f'Stream chunk error: {str(e_chunk)}'})}\n\n"
+                yield 'data: [DONE]\n\n'
+            except Exception as e_outer:
                 logger.error(f"Conv {conversation_id}: Error during event_stream_generator iteration: {e_outer}", exc_info=True)
-                yield f"data: {json.dumps({'error': f'Stream iteration error: {str(e_outer)}'})}\n\n" # Ensure e is string
-                yield 'data: [DONE]\n\n' # End stream for client
+                yield f"data: {json.dumps({'error': f'Stream iteration error: {str(e_outer)}'})}\n\n"
+                yield 'data: [DONE]\n\n'
             finally:
                 if api_response:
-                    api_response.close() # Crucial to close the connection to DeepSeek
+                    api_response.close()
                 logger.info(f"Conv {conversation_id}: Finished event_stream_generator and closed API response.")
 
-        # Return the StreamingHttpResponse with the generator
         return StreamingHttpResponse(event_stream_generator(), content_type="text/event-stream")
 
     except json.JSONDecodeError:
@@ -242,7 +232,7 @@ def stream_chat(request): # Renamed from your previous "stream_chat_api" to matc
     except Exception as e:
         logger.error(f"Unhandled error in stream_chat: {e}", exc_info=True)
         def error_stream_unhandled():
-            yield f"data: {json.dumps({'error': f'服务器内部错误: {str(e)}'})}\n\n" # Ensure e is string
+            yield f"data: {json.dumps({'error': f'服务器内部错误: {str(e)}'})}\n\n"
             yield 'data: [DONE]\n\n'
         return StreamingHttpResponse(error_stream_unhandled(), content_type="text/event-stream")
 
@@ -312,7 +302,7 @@ def get_conversation_messages(request, conversation_id):
         return JsonResponse({'error': 'Invalid Conversation ID format'}, status=400)
     except Exception as e:
         logger.error(f"Error fetching messages for conversation {conversation_id}: {e}", exc_info=True)
-        return JsonResponse({'error': f'Error fetching messages: {str(e)}'}, status=500) # Ensure e is string
+        return JsonResponse({'error': f'Error fetching messages: {str(e)}'}, status=500)
 
 @login_required
 def delete_conversation(request, conversation_id):
