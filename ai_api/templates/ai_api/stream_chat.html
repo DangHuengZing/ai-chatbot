@@ -219,9 +219,9 @@ const punctuationDelays = {
 };
 
         // 动态计算延迟时间，随着已显示字符的增加逐渐加速
-const baseDelay = 150;  // 初始延迟
-const minDelay = 50;    // 最小延迟
-const accelerationFactor = 0.05; // 加速因子，值越大加速越明显
+const baseDelay = 100;  //// 初始延迟，调整为更低的值
+const minDelay = 30;    // 最小延迟最小延迟，减少到30
+const accelerationFactor = 0.1; // 加速因子，值越大加速越明显增加加速因子，改为0.1，增加加速效果
 
 function calculateTypingDelay(charCount) {
     // 这里的计算方式是基于字符的数量来减少延迟
