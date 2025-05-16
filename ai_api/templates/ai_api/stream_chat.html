@@ -218,30 +218,45 @@ const punctuationDelays = {
     ':': 200, '：': 200, ';': 200, '；': 200
 };
 
+        // 动态计算延迟时间，随着已显示字符的增加逐渐加速
+const baseDelay = 150;  // 初始延迟
+const minDelay = 50;    // 最小延迟
+const accelerationFactor = 0.05; // 加速因子，值越大加速越明显
+
+function calculateTypingDelay(charCount) {
+    // 这里的计算方式是基于字符的数量来减少延迟
+    const delay = baseDelay - (charCount * accelerationFactor);
+    return Math.max(delay, minDelay);  // 保证延迟不小于最小值
+}
+
 function enqueueTyping(content) {
     typingQueue.push(...content.split(''));
     processTypingQueue();
 }
 
+// 从缓冲队列中逐个显示字符
 function processTypingQueue() {
-    if (isTyping) return;
+    if (isTyping) return;  // 正在进行则退出，避免并行执行
     isTyping = true;
+
+    let charCount = 0;  // 统计已显示的字符数量
 
     function typeNext() {
         if (typingQueue.length === 0) {
-            isTyping = false;
-            aiMessageContentDiv.innerHTML = renderMarkdown(aiMessageContentDiv.textContent);
-            scrollToBottom();
+            isTyping = false;  // 队列为空，停止执行
             return;
         }
 
-        const nextChar = typingQueue.shift();
-        aiMessageContentDiv.textContent += nextChar;
+        const nextChar = typingQueue.shift();  // 取出下一个字符
+        aiMessageContentDiv.textContent += nextChar;  // 追加到显示区
+        charCount++;  // 增加已显示字符数量
 
-        scrollToBottom();
+        scrollToBottom();  // 每个字符后滚动到最新
 
-        const delay = punctuationDelays[nextChar] || (Math.random() * 70 + 50);
-        setTimeout(typeNext, delay);
+        // 根据已显示字符数量动态计算延迟
+        const delay = calculateTypingDelay(charCount);
+
+        setTimeout(typeNext, delay);  // 延迟后继续下一个字符
     }
 
     typeNext();
