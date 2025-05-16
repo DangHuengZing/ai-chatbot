@@ -124,6 +124,7 @@
         const conversationList = document.getElementById('conversation-list');
 
         let isUserScrolling = false;
+        let isNearBottom = false;
         const sidebarUpdateDebounce = 1000;
 
         if (currentConversationId === '' || currentConversationId === 'None' || currentConversationId === 'undefined') {
@@ -147,39 +148,63 @@
 function autoScroll() {
     // 只在用户没有滚动的情况下进行自动滚动
     if (!isUserScrolling) {
-        const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
-        if (isNearBottom) {
-            scrollToBottomBtn.style.display = 'none';
+        const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
+        if (isAtBottom) {
+            scrollToBottomBtn.style.display = 'none'; // 隐藏滚动到最底部的按钮
+            isNearBottom = true;
         } else if (chatBox.scrollHeight > chatBox.clientHeight + 50) {
-            scrollToBottomBtn.style.display = 'block';
-        } else {
-            scrollToBottomBtn.style.display = 'none';
+            scrollToBottomBtn.style.display = 'block'; // 显示按钮
+            isNearBottom = false;
         }
     }
 }
 
-        function scrollToBottom() {
-            // console.log("Forcing scroll to bottom");
-            chatBox.scrollTop = chatBox.scrollHeight;
-            scrollToBottomBtn.style.display = 'none';
-            isUserScrolling = false; // Reset flag when explicitly scrolling to bottom
-        }
+        // 改进自动滚动按钮点击事件
+function scrollToBottom() {
+    chatBox.scrollTop = chatBox.scrollHeight;  // 滚动到底部
+    scrollToBottomBtn.style.display = 'none';  // 隐藏滚动按钮
+    isUserScrolling = false; // 重置标志
+}
 
         let scrollTimeout;
-        chatBox.addEventListener('scroll', () => {
-            const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 5;
-            if (!isAtBottom) {
-                isUserScrolling = true; // User has scrolled up
-                // console.log("User is scrolling up.");
-            } else {
-                // If user scrolls back to bottom manually, reset the flag
-                // isUserScrolling = false; 
-                // console.log("User scrolled to bottom manually or near bottom.");
-            }
-            autoScroll(); // Update button visibility
-        });
+        // 当用户滚动时，设置标志为 true
+chatBox.addEventListener('scroll', () => {
+    const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop <= chatBox.clientHeight + 5;
+
+    if (!isAtBottom) {
+        isUserScrolling = true;  // 用户滚动时，标记为手动滚动
+    } else {
+        isUserScrolling = false; // 如果用户滚动到最底部，则恢复自动滚动
+    }
+
+    // 检测是否接近底部
+    const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
+    if (!isNearBottom) {
+        autoScroll();  // 更新滚动按钮显示
+    }
+});
 
 
+        // 逐步恢复自动滚动
+function gradualScrollToBottom() {
+    if (isUserScrolling) return; // 如果用户在滚动，暂时不恢复自动滚动
+
+    let currentScroll = chatBox.scrollTop;
+    let targetScroll = chatBox.scrollHeight;
+    
+    if (currentScroll < targetScroll) {
+        // 逐渐滚动
+        let scrollDifference = targetScroll - currentScroll;
+        let step = Math.min(scrollDifference, 50); // 每次滚动50px
+        chatBox.scrollTop = currentScroll + step;
+
+        // 每个动画帧执行一次
+        requestAnimationFrame(gradualScrollToBottom);
+    } else {
+        chatBox.scrollTop = targetScroll;
+    }
+}
+        
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -219,9 +244,9 @@ const punctuationDelays = {
 };
 
         // 动态计算延迟时间，随着已显示字符的增加逐渐加速
-const baseDelay = 40;  //// 初始延迟，调整为更低的值
-const minDelay = 5;    // 最小延迟最小延迟，减少到30
-const accelerationFactor = 0.6; // 加速因子，值越大加速越明显增加加速因子，改为0.1，增加加速效果
+const baseDelay = 50;  //// 初始延迟，调整为更低的值
+const minDelay = 10;    // 最小延迟最小延迟，减少到30
+const accelerationFactor = 0.5; // 加速因子，值越大加速越明显增加加速因子，改为0.1，增加加速效果
 
 function calculateTypingDelay(charCount) {
     // 这里的计算方式是基于字符的数量来减少延迟
