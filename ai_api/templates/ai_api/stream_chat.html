@@ -208,243 +208,167 @@
         }
         function handleKeydown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }
 
-        // 定义全局变量（缓冲队列）
         let typingQueue = [];
-        let isTyping = false;
+let isTyping = false;
+let aiMessageContentDiv; // 设为全局变量，避免局部作用域问题
 
-        // 标点符号特殊延迟映射
-        const punctuationDelays = {
-            ',': 150,
-            '，': 150,
-            '.': 400,
-            '。': 400,
-            '!': 400,
-            '！': 400,
-            '?': 400,
-            '？': 400,
-            ':': 200,
-            '：': 200,
-            ';': 200,
-            '；': 200
-        };
+const punctuationDelays = {
+    ',': 150, '，': 150, '.': 400, '。': 400,
+    '!': 400, '！': 400, '?': 400, '？': 400,
+    ':': 200, '：': 200, ';': 200, '；': 200
+};
 
-        // 新数据加入缓冲队列
-        function enqueueTyping(content) {
-            typingQueue.push(...content.split(''));  // 按字符逐个入队
-            processTypingQueue();                    // 启动显示处理
-        }
+function enqueueTyping(content) {
+    typingQueue.push(...content.split(''));
+    processTypingQueue();
+}
 
-        // 从缓冲队列中逐个显示字符
-        function processTypingQueue() {
-            if (isTyping) return;  // 正在进行则退出，避免并行执行
-            isTyping = true;
+function processTypingQueue() {
+    if (isTyping) return;
+    isTyping = true;
 
-            function typeNext() {
-                 if (typingQueue.length === 0) {
-                     isTyping = false;  // 队列为空，停止执行
-                    return;
-                }
-
-                const nextChar = typingQueue.shift();  // 取出下一个字符
-                aiMessageContentDiv.textContent += nextChar;  // 追加到显示区
-
-                scrollToBottom();  // 每个字符后滚动到最新
-
-                // 根据标点符号选择延迟
-                const delay = punctuationDelays[nextChar] || (Math.random() * 70 + 50);
-
-                setTimeout(typeNext, delay);  // 延迟后继续下一个字符
-            }
-
-            typeNext();
-        }
-
-        async function sendMessage() {
-            console.log("sendMessage called. currentConversationId at start:", currentConversationId); // 日志1
-            const question = userInput.value.trim();
-            const model = document.getElementById('model-select').value; // Get selected model
-            console.log("Model selected by user in sendMessage:", model); // 日志 M1 - Log selected model
-            if (!question) return;
-            
-            let firstChunk = true; 
-            isUserScrolling = false; // For a new message, assume we want to auto-scroll
-
-            sendBtn.disabled = true; sendBtn.textContent = '思考中';
-            userInput.value = ''; userInput.style.height = 'auto';
-            hideError();
-
-            const userMsgDiv = document.createElement('div');
-            userMsgDiv.className = 'message user-message';
-            const sanitizedQuestion = DOMPurify.sanitize(question, { USE_PROFILES: { html: true } });
-            userMsgDiv.innerHTML = `<strong>您:</strong><div class="message-content">${sanitizedQuestion.replace(/\n/g, '<br>')}</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
-            chatBox.appendChild(userMsgDiv);
-            scrollToBottom(); 
-
-            const aiMsgDiv = document.createElement('div');
-            aiMsgDiv.className = 'message ai-message';
-            aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content"></div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
-            const aiMessageContentDiv = aiMsgDiv.querySelector('.message-content');
-            const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
-            aiMessageContentDiv.textContent = '思考中...'; 
-            chatBox.appendChild(aiMsgDiv);
-            scrollToBottom(); 
-
-            const csrftoken = getCookie('csrftoken');
-            if (!csrftoken) { console.error('CSRF token not found'); showError('CSRF Token 缺失'); sendBtn.disabled = false; sendBtn.textContent = '发送'; aiMessageContentDiv.textContent = '请求准备失败。'; return; }
-
-            let isNewConversationAtStart = !currentConversationId; 
-            let tempStreamConvId = null; 
-            let accumulatedContent = ''; 
-
-            console.log("Sending to backend:", { question, model: model, conversation_id: currentConversationId }); // 日志2
-            try {
-                const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-                    body: JSON.stringify({ question, model: model, conversation_id: currentConversationId }) 
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.text();
-                    let detailErrorMessage = errorData;
-                    try { const jsonError = JSON.parse(errorData); if (jsonError && (jsonError.error || jsonError.detail)) { detailErrorMessage = jsonError.error || jsonError.detail; } } catch (e) { /* ignore */ }
-                    throw new Error(`HTTP error ${response.status}: ${detailErrorMessage}`);
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                let rawDataForDoneCheck = '';
-                let eol;
-                console.log("Starting stream processing. isNewConversationAtStart:", isNewConversationAtStart); // 日志3
-
-                if (firstChunk) { 
-                    aiMessageContentDiv.textContent = ''; 
-                }
-
-                while (true) { 
-                    const { done, value } = await reader.read();
-                    console.log(`Stream outer loop: done = ${done}, value received = ${value ? value.byteLength : 0} bytes`); // 日志4
-
-                    if (done) {
-                        console.log("Stream reader marked as done."); // 日志5
-                        if (buffer.trim().startsWith('data: ')) { 
-                            const lastLine = buffer.trim();
-                            rawDataForDoneCheck = lastLine.substring(6).trim();
-                            if (rawDataForDoneCheck !== '[DONE]') {
-                                try {
-                                    const data = JSON.parse(rawDataForDoneCheck);
-                                    if (data.content) {
-                                        if (firstChunk) { accumulatedContent = data.content; firstChunk = false; } 
-                                        else { accumulatedContent += data.content; }
-                                        aiMessageContentDiv.textContent = accumulatedContent; 
-                                        console.log("Updated AI message with final buffered chunk (textContent):", data.content); // 日志12a
-                                        scrollToBottom(); // Scroll after update
-                                        await new Promise(resolve => requestAnimationFrame(resolve)); 
-                                    }
-                                    if (data.conversation_id && isNewConversationAtStart && !tempStreamConvId) {
-                                        tempStreamConvId = data.conversation_id;
-                                        console.log("New conversation ID from final stream data (temp):", tempStreamConvId); // 日志11a
-                                    }
-                                } catch (e) { console.warn('Error parsing final chunk:', rawDataForDoneCheck, e); }
-                            }
-                        }
-                        break; 
-                    }
-
-                    buffer += decoder.decode(value, { stream: true });
-                    console.log(`Buffer content now (length ${buffer.length}): "${buffer}"`); // 日志6
-                    
-                    while ((eol = buffer.indexOf('\n\n')) >= 0) { 
-                        const line = buffer.substring(0, eol).trim();
-                        buffer = buffer.substring(eol + 2);
-                        console.log(`Processing line from buffer: "${line}"`); // 日志7
-
-                        if (line.startsWith('data: ')) {
-                            rawDataForDoneCheck = line.substring(6).trim();
-                            console.log(`Parsed data string from line: "${rawDataForDoneCheck}"`); // 日志8
-
-                            if (rawDataForDoneCheck === '[DONE]') {
-                                console.log("[DONE] signal received in stream's data line. Breaking inner loop."); // 日志9
-                                break; 
-                            }
-                            try {
-                                const data = JSON.parse(rawDataForDoneCheck);
-                                console.log("Parsed JSON data from line:", data); // 日志10
-
-                                if (data.conversation_id && isNewConversationAtStart && !tempStreamConvId) {
-                                    tempStreamConvId = data.conversation_id;
-                                    console.log("New conversation ID from stream data (temp):", tempStreamConvId); // 日志11b
-                                }
-
-                                if (data.error) { 
-                                    accumulatedContent = `错误: ${data.error}`; 
-                                    showError(data.error); 
-                                    rawDataForDoneCheck = '[DONE]'; 
-                                    break; 
-                                } else if (data.content) {
-                                    if (firstChunk) { 
-                                        enqueueTyping(data.content);  // 替换成调用 enqueueTyping 函数 
-                                    }
-                                    aiMessageContentDiv.textContent = accumulatedContent; 
-                                    console.log("Updated AI message content with chunk (textContent):", data.content); // 日志12
-                                    scrollToBottom(); // Scroll after update
-                                    await new Promise(resolve => requestAnimationFrame(resolve)); 
-                                }
-                            } catch (e) { 
-                                console.error('解析流数据错误:', rawDataForDoneCheck, e); 
-                                accumulatedContent += "\n[数据解析错误]"; 
-                                aiMessageContentDiv.textContent = accumulatedContent;
-                                scrollToBottom(); 
-                            }
-                        }
-                    } 
-                    if (rawDataForDoneCheck === '[DONE]') {
-                        console.log("[DONE] signal breaking outer stream loop after inner loop processing."); // 日志13
-                        break; 
-                    }
-                } 
-                console.log("Exited stream processing loop. Final tempStreamConvId:", tempStreamConvId); // 日志14
-                
-                console.log("Applying final Markdown rendering to accumulated content:", accumulatedContent); // 日志 M1
-                aiMessageContentDiv.innerHTML = renderMarkdown(accumulatedContent); 
-                scrollToBottom(); // Scroll after final markdown render
-
-                if (isNewConversationAtStart && tempStreamConvId) {
-                    currentConversationId = tempStreamConvId; 
-                    console.log("Global currentConversationId updated to (was new):", currentConversationId); // 日志15
-                    history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
-                }
-
-                if (rawDataForDoneCheck === '[DONE]' && firstChunk && accumulatedContent === '') { 
-                    if (aiMessageContentDiv.textContent.includes('思考中...') || aiMessageContentDiv.innerHTML === '') {
-                         aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
-                    }
-                }
-
-            } catch (error) {
-                console.error('请求错误:', error);
-                aiMessageContentDiv.innerHTML = renderMarkdown(`请求失败: ${error.message || '请检查网络'}`);
-                showError(`请求失败: ${error.message || '请重试'}`);
-            } finally {
-                sendBtn.disabled = false; sendBtn.textContent = '发送';
-                aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
-                // scrollToBottom(); // Already called within loop and after markdown render
-                
-                let needsSidebarUpdate = false;
-                if (isNewConversationAtStart && currentConversationId && tempStreamConvId === currentConversationId) { 
-                    needsSidebarUpdate = true;
-                    console.log("Sidebar update needed: New conversation ID fully established.", currentConversationId);
-                }
-                
-                if (needsSidebarUpdate) {
-                    debounceUpdateSidebar();
-                }
-            // 当流式数据结束 ([DONE]) 后再进行 markdown 渲染
+    function typeNext() {
+        if (typingQueue.length === 0) {
+            isTyping = false;
             aiMessageContentDiv.innerHTML = renderMarkdown(aiMessageContentDiv.textContent);
             scrollToBottom();
-            }
+            return;
         }
+
+        const nextChar = typingQueue.shift();
+        aiMessageContentDiv.textContent += nextChar;
+
+        scrollToBottom();
+
+        const delay = punctuationDelays[nextChar] || (Math.random() * 70 + 50);
+        setTimeout(typeNext, delay);
+    }
+
+    typeNext();
+}
+
+
+        async function sendMessage() {
+    const question = userInput.value.trim();
+    const model = document.getElementById('model-select').value;
+    if (!question) return;
+
+    isUserScrolling = false;
+    sendBtn.disabled = true;
+    sendBtn.textContent = '思考中';
+    userInput.value = '';
+    userInput.style.height = 'auto';
+    hideError();
+
+    const userMsgDiv = document.createElement('div');
+    userMsgDiv.className = 'message user-message';
+    const sanitizedQuestion = DOMPurify.sanitize(question, { USE_PROFILES: { html: true } });
+    userMsgDiv.innerHTML = `<strong>您:</strong><div class="message-content">${sanitizedQuestion.replace(/\n/g, '<br>')}</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
+    chatBox.appendChild(userMsgDiv);
+    scrollToBottom();
+
+    const aiMsgDiv = document.createElement('div');
+    aiMsgDiv.className = 'message ai-message';
+    aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content"></div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
+    aiMessageContentDiv = aiMsgDiv.querySelector('.message-content');
+    const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
+    aiMessageContentDiv.textContent = '';
+    chatBox.appendChild(aiMsgDiv);
+    scrollToBottom();
+
+    const csrftoken = getCookie('csrftoken');
+    if (!csrftoken) {
+        console.error('CSRF token not found');
+        showError('CSRF Token 缺失');
+        sendBtn.disabled = false;
+        sendBtn.textContent = '发送';
+        aiMessageContentDiv.textContent = '请求准备失败。';
+        return;
+    }
+
+    let isNewConversationAtStart = !currentConversationId;
+    let tempStreamConvId = null;
+
+    try {
+        const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+            body: JSON.stringify({ question, model, conversation_id: currentConversationId })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`HTTP error ${response.status}: ${errorData}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let rawDataForDoneCheck = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eol;
+            while ((eol = buffer.indexOf('\n\n')) >= 0) {
+                const line = buffer.substring(0, eol).trim();
+                buffer = buffer.substring(eol + 2);
+
+                if (line.startsWith('data: ')) {
+                    rawDataForDoneCheck = line.substring(6).trim();
+
+                    if (rawDataForDoneCheck === '[DONE]') break;
+
+                    try {
+                        const data = JSON.parse(rawDataForDoneCheck);
+
+                        if (data.content) {
+                            enqueueTyping(data.content);
+                        }
+
+                        if (data.conversation_id && isNewConversationAtStart && !tempStreamConvId) {
+                            tempStreamConvId = data.conversation_id;
+                        }
+
+                        if (data.error) {
+                            showError(data.error);
+                            rawDataForDoneCheck = '[DONE]';
+                            break;
+                        }
+
+                    } catch (e) {
+                        console.error('解析流数据错误:', rawDataForDoneCheck, e);
+                        showError("数据解析错误");
+                    }
+                }
+            }
+            if (rawDataForDoneCheck === '[DONE]') break;
+        }
+
+        if (isNewConversationAtStart && tempStreamConvId) {
+            currentConversationId = tempStreamConvId;
+            history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
+            debounceUpdateSidebar();
+        }
+
+        if (!aiMessageContentDiv.textContent) {
+            aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
+        }
+
+    } catch (error) {
+        console.error('请求错误:', error);
+        aiMessageContentDiv.innerHTML = renderMarkdown(`请求失败: ${error.message || '请检查网络'}`);
+        showError(`请求失败: ${error.message || '请重试'}`);
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = '发送';
+        aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
+    }
+}
+
 
         function renderMarkdown(text) {
             const rawHtml = marked.parse(text, { breaks: true, gfm: true, pedantic: false, sanitize: false });
