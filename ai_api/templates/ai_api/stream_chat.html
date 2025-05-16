@@ -143,20 +143,20 @@
             userInput.style.height = `${newHeight}px`;
         });
 
-        function autoScroll() {
-            // This function is now primarily for managing the scroll-to-bottom button
-            const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
-            if (isNearBottom) {
-                scrollToBottomBtn.style.display = 'none';
-                // If user was scrolling but reached bottom, allow auto-scroll for next messages
-                // However, sendMessage now directly uses scrollToBottom for new messages.
-                // isUserScrolling = false; 
-            } else if (chatBox.scrollHeight > chatBox.clientHeight + 50) {
-                scrollToBottomBtn.style.display = 'block';
-            } else {
-                scrollToBottomBtn.style.display = 'none';
-            }
+// 自动滚动函数，只有在用户没有滚动的情况下才会执行
+function autoScroll() {
+    // 只在用户没有滚动的情况下进行自动滚动
+    if (!isUserScrolling) {
+        const isNearBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 150;
+        if (isNearBottom) {
+            scrollToBottomBtn.style.display = 'none';
+        } else if (chatBox.scrollHeight > chatBox.clientHeight + 50) {
+            scrollToBottomBtn.style.display = 'block';
+        } else {
+            scrollToBottomBtn.style.display = 'none';
         }
+    }
+}
 
         function scrollToBottom() {
             // console.log("Forcing scroll to bottom");
