@@ -99,7 +99,12 @@ def stream_chat(request):
         messages_for_api = [{'role': 'assistant' if msg.role == 'ai' else msg.role, 'content': msg.content} for msg in reversed(history_qs)]
         messages_for_api.append({'role': 'user', 'content': question})
 
+        # 当 model_choice 为 "r1" 时，api_model_name 为 "deepseek-reasoner"
+        # 当 model_choice 为 "v3" 时，api_model_name 为 "deepseek-chat"
         api_model_name = "deepseek-chat" if model_choice == "v3" else "deepseek-reasoner"
+        logger.info(f"User {request.user.username} selected model_choice: '{model_choice}', mapped to api_model_name: '{api_model_name}' for conv {conversation_id}")
+
+
         headers = {
             'Authorization': f'Bearer {settings.DEEPSEEK_API_KEY}',
             'Content-Type': 'application/json',
@@ -121,31 +126,53 @@ def stream_chat(request):
                 stream=True,
                 timeout= (15, 180)
             )
-            api_response.raise_for_status()
+            # 在调用 raise_for_status() 之前，检查是否有错误并记录详细信息
+            if api_response.status_code >= 400:
+                error_text_from_api = api_response.text # 获取原始错误文本
+                logger.error(
+                    f"DeepSeek API returned an error for conv {conversation_id}. "
+                    f"Model: {api_model_name}, Status: {api_response.status_code}, Response: {error_text_from_api}"
+                )
+            api_response.raise_for_status() # 如果状态码是 4xx 或 5xx，则会引发 HTTPError
+
         except requests.exceptions.Timeout:
-            logger.error(f"DeepSeek API request timed out for conv {conversation_id}")
+            logger.error(f"DeepSeek API request timed out for conv {conversation_id}, model {api_model_name}")
             if api_response: api_response.close()
             def error_stream_timeout():
                 yield f"data: {json.dumps({'error': 'API request timed out'})}\n\n"
                 yield 'data: [DONE]\n\n'
             return StreamingHttpResponse(error_stream_timeout(), content_type="text/event-stream")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"DeepSeek API request failed for conv {conversation_id}: {str(e)}", exc_info=True) # 使用 str(e)
+
+        except requests.exceptions.HTTPError as http_err: # 更具体地捕获 HTTPError
+            # logger.error 调用已在上面 if api_response.status_code >= 400 块中记录了详细的 api_response.text
+            logger.error(f"DeepSeek API HTTPError for conv {conversation_id}, model {api_model_name}: {str(http_err)}", exc_info=True)
+            if api_response: api_response.close()
+            def error_stream_http_err():
+                # 向客户端发送一个更通用的错误，依赖服务器日志获取详细信息
+                status_code = api_response.status_code if api_response else "Unknown"
+                error_payload = {'error': f'API request failed with status {status_code}. Check server logs for details.'}
+                yield f"data: {json.dumps(error_payload)}\n\n"
+                yield 'data: [DONE]\n\n'
+            return StreamingHttpResponse(error_stream_http_err(), content_type="text/event-stream")
+
+        except requests.exceptions.RequestException as e: # 捕获其他请求相关的异常 (例如网络问题)
+            logger.error(f"DeepSeek API RequestException for conv {conversation_id}, model {api_model_name}: {str(e)}", exc_info=True)
             if api_response: api_response.close()
             def error_stream_req_exc():
-                yield f"data: {json.dumps({'error': f'API request error: {str(e)}'})}\n\n" # 使用 str(e)
+                error_payload = {'error': f'API connection error. Check server logs for details: {str(e)}'}
+                yield f"data: {json.dumps(error_payload)}\n\n"
                 yield 'data: [DONE]\n\n'
             return StreamingHttpResponse(error_stream_req_exc(), content_type="text/event-stream")
 
         def event_stream_generator():
             full_ai_content = ""
             sent_conversation_id_in_stream = False
-            first_chunk_logged = False # 新增：用于标记第一个数据块是否已记录日志
+            first_chunk_logged = False
             try:
-                logger.info(f"Conv {conversation_id}: event_stream_generator started.") # 修改：更明确的开始日志
+                logger.info(f"Conv {conversation_id}, Model {api_model_name}: event_stream_generator started.")
                 for line_bytes in api_response.iter_lines():
-                    if not first_chunk_logged: # 新增：记录第一个数据块到达
-                        logger.info(f"Conv {conversation_id}: First chunk received from DeepSeek.")
+                    if not first_chunk_logged:
+                        logger.info(f"Conv {conversation_id}, Model {api_model_name}: First chunk received from DeepSeek.")
                         first_chunk_logged = True
 
                     if not line_bytes:
@@ -159,17 +186,17 @@ def stream_chat(request):
                     raw_data = line.removeprefix("data:").strip()
 
                     if raw_data == '[DONE]':
-                        logger.info(f"Conv {conversation_id}: DeepSeek stream [DONE] received. Full AI content length: {len(full_ai_content)}")
+                        logger.info(f"Conv {conversation_id}, Model {api_model_name}: DeepSeek stream [DONE] received. Full AI content length: {len(full_ai_content)}")
                         if full_ai_content:
                             ChatMessage.objects.create(
                                 user=request.user,
                                 conversation_id=conversation_id,
-                                model_type=model_choice,
+                                model_type=model_choice, # 使用原始的 model_choice
                                 role='ai',
                                 content=full_ai_content,
                                 is_stream=True
                             )
-                        logger.info(f"Conv {conversation_id}: Yielding [DONE] to client.") # 修改：更明确的结束日志
+                        logger.info(f"Conv {conversation_id}, Model {api_model_name}: Yielding [DONE] to client.")
                         yield 'data: [DONE]\n\n'
                         break
 
@@ -187,41 +214,46 @@ def stream_chat(request):
                             yield f"data: {json.dumps(data_to_send)}\n\n"
 
                     except json.JSONDecodeError:
-                        logger.warning(f"Invalid JSON in stream for conv {conversation_id}: {raw_data}")
-                        yield f"data: {json.dumps({'error': 'Invalid JSON chunk in stream'})}\n\n"
+                        logger.warning(f"Invalid JSON in stream for conv {conversation_id}, Model {api_model_name}: {raw_data}")
+                        # 即使JSON解析失败，也继续尝试处理流中的下一行，但向客户端发送一个错误块
+                        yield f"data: {json.dumps({'error': 'Invalid JSON chunk in stream', 'details': raw_data})}\n\n"
                         continue
                     except Exception as e_inner:
-                        logger.error(f"Error processing DeepSeek stream chunk for conv {conversation_id}: {str(e_inner)}", exc_info=True) # 使用 str(e_inner)
-                        yield f"data: {json.dumps({'error': f'Error processing stream chunk: {str(e_inner)}'})}\n\n" # 使用 str(e_inner)
+                        logger.error(f"Error processing DeepSeek stream chunk for conv {conversation_id}, Model {api_model_name}: {str(e_inner)}", exc_info=True)
+                        yield f"data: {json.dumps({'error': f'Error processing stream chunk: {str(e_inner)}'})}\n\n"
+                        # 发生内部处理错误时，最好也发送[DONE]并中断
+                        yield 'data: [DONE]\n\n'
                         break
-            except requests.exceptions.ChunkedEncodingError as e_chunk:
-                logger.error(f"ChunkedEncodingError during stream for conv {conversation_id}: {str(e_chunk)}", exc_info=True) # 使用 str(e_chunk)
-                yield f"data: {json.dumps({'error': f'Stream chunk error: {str(e_chunk)}'})}\n\n" # 使用 str(e_chunk)
+            except requests.exceptions.ChunkedEncodingError as e_chunk: # 在迭代 api_response.iter_lines() 时可能发生
+                logger.error(f"ChunkedEncodingError during stream for conv {conversation_id}, Model {api_model_name}: {str(e_chunk)}", exc_info=True)
+                yield f"data: {json.dumps({'error': f'Stream chunk error: {str(e_chunk)}'})}\n\n"
                 yield 'data: [DONE]\n\n'
-            except Exception as e_outer:
-                logger.error(f"Error during event_stream_generator iteration for conv {conversation_id}: {str(e_outer)}", exc_info=True) # 使用 str(e_outer)
-                yield f"data: {json.dumps({'error': f'Stream iteration error: {str(e_outer)}'})}\n\n" # 使用 str(e_outer)
+            except Exception as e_outer: # 捕获生成器中的其他意外错误
+                logger.error(f"Error during event_stream_generator iteration for conv {conversation_id}, Model {api_model_name}: {str(e_outer)}", exc_info=True)
+                yield f"data: {json.dumps({'error': f'Stream iteration error: {str(e_outer)}'})}\n\n"
                 yield 'data: [DONE]\n\n'
             finally:
                 if api_response:
                     api_response.close()
-                logger.info(f"Conv {conversation_id}: event_stream_generator finished.") # 修改：更明确的结束日志
+                logger.info(f"Conv {conversation_id}, Model {api_model_name}: event_stream_generator finished.")
 
         return StreamingHttpResponse(event_stream_generator(), content_type="text/event-stream")
 
-    except json.JSONDecodeError:
+    except json.JSONDecodeError: # 请求体JSON解析错误
         logger.error("Invalid JSON in request body for stream_chat", exc_info=True)
-        def error_stream_json():
-            yield f"data: {json.dumps({'error': '无效的请求数据'})}\n\n"
+        def error_stream_json_body():
+            yield f"data: {json.dumps({'error': '无效的请求数据 (Invalid request body JSON)'})}\n\n"
             yield 'data: [DONE]\n\n'
-        return StreamingHttpResponse(error_stream_json(), content_type="text/event-stream")
-    except Exception as e:
-        logger.error(f"Unhandled error in stream_chat: {e}", exc_info=True)
-        def error_stream_unhandled():
-            yield f"data: {json.dumps({'error': f'服务器内部错误: {str(e)}'})}\n\n" # 使用 str(e)
+        return StreamingHttpResponse(error_stream_json_body(), content_type="text/event-stream")
+    except Exception as e: # stream_chat 函数级别的其他未捕获错误
+        logger.error(f"Unhandled error in stream_chat view for conv {conversation_id if 'conversation_id' in locals() else 'Unknown'}: {str(e)}", exc_info=True)
+        def error_stream_unhandled_view():
+            error_msg = f'服务器内部错误，请检查日志 (Unhandled server error. Conversation ID: {str(conversation_id) if "conversation_id" in locals() else "N/A"})'
+            yield f"data: {json.dumps({'error': error_msg})}\n\n"
             yield 'data: [DONE]\n\n'
-        return StreamingHttpResponse(error_stream_unhandled(), content_type="text/event-stream")
+        return StreamingHttpResponse(error_stream_unhandled_view(), content_type="text/event-stream")
 
+# --- get_conversations, get_conversation_messages, delete_conversation 保持不变 ---
 @login_required
 def get_conversations(request):
     logger.info(f"get_conversations called by user: {request.user.username}")
@@ -290,7 +322,7 @@ def get_conversation_messages(request, conversation_id):
         return JsonResponse({'error': 'Invalid Conversation ID format'}, status=400)
     except Exception as e:
         logger.error(f"Error fetching messages for conversation {conversation_id}: {e}", exc_info=True)
-        return JsonResponse({'error': f'Error fetching messages: {str(e)}'}, status=500) # 使用 str(e)
+        return JsonResponse({'error': f'Error fetching messages: {str(e)}'}, status=500)
 
 @login_required
 def delete_conversation(request, conversation_id):
