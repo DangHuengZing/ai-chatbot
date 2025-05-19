@@ -23,89 +23,327 @@
             --input-border-color: #ccc;
             --error-bg: #ffebee;
             --error-text: #c62828;
+            --sidebar-width-pc: 260px;
+            --sidebar-width-tablet: 220px;
+            --sidebar-width-mobile: 260px; /* Off-canvas width */
         }
-        body { background-color: var(--bg-color); font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--text-color); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
-        .container { display: flex; width: 100%; height: 100%; flex-wrap: wrap; }
-        .sidebar { width: 260px; background: var(--sidebar-bg); color: var(--sidebar-text-color); padding: 1rem; display: flex; flex-direction: column; border-right: 1px solid #3a3a3c; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
-        .sidebar-header { padding-bottom: 1rem; border-bottom: 1px solid #3a3a3c; margin-bottom: 1rem; }
-        .sidebar-header h3 { font-size: 1.1rem; margin: 0 0 0.8rem 0; text-align: center; }
-        .sidebar .new-chat-btn { background-color: var(--primary-accent); color: var(--button-text-color); border: none; padding: 0.75rem; border-radius: 6px; cursor: pointer; width: 100%; font-size: 0.9rem; transition: background-color 0.2s; margin-bottom: 1rem; }
-        .sidebar .new-chat-btn:hover { background-color: #0e8e6d; }
-        #conversation-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
-        #conversation-list li { padding: 0.7rem 0.5rem; margin-bottom: 0.5rem; border-radius: 5px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.2s; }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            display: flex; /* Ensures .container can take full height */
+            height: 100vh;
+            overflow: hidden; /* Prevent body scroll, scrolling managed internally */
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            /* flex-wrap: wrap; /* Removed for new layout logic */
+        }
+
+        /* Sidebar Base (Mobile-first: Off-canvas drawer) */
+        .sidebar {
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text-color);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            
+            position: fixed;
+            top: 0;
+            left: calc(-1 * var(--sidebar-width-mobile)); /* Initially hidden off-screen */
+            width: var(--sidebar-width-mobile);
+            height: 100%;
+            z-index: 1000;
+            transition: left 0.3s ease-in-out;
+            overflow-y: auto;
+        }
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-header {
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #3a3a3c;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
+        }
+        .sidebar-header h3 {
+            font-size: 1rem; /* Adjusted for mobile */
+            margin: 0 0 0.8rem 0;
+            text-align: center;
+        }
+        .sidebar .new-chat-btn {
+            background-color: var(--primary-accent);
+            color: var(--button-text-color);
+            border: none;
+            padding: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+            margin-bottom: 1rem;
+            flex-shrink: 0;
+        }
+        .sidebar .new-chat-btn:hover {
+            background-color: #0e8e6d;
+        }
+
+        #conversation-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+        #conversation-list li {
+            padding: 0.5rem; /* Adjusted for mobile */
+            margin-bottom: 0.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
         #conversation-list li:hover,
-        #conversation-list li.active { background-color: var(--sidebar-hover-bg); }
-        #conversation-list li .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; margin-right: 0.5rem; }
-        #conversation-list li .delete-btn { background: none; border: none; color: #aaa; cursor: pointer; padding: 0.3rem; font-size: 0.8rem; }
-        #conversation-list li .delete-btn:hover { color: var(--sidebar-text-color); }
-        .sidebar-footer { padding-top: 1rem; border-top: 1px solid #3a3a3c; font-size: 0.85rem; }
+        #conversation-list li.active {
+            background-color: var(--sidebar-hover-bg);
+        }
+        #conversation-list li .title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-grow: 1;
+            margin-right: 0.5rem;
+        }
+        #conversation-list li .delete-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            padding: 0.3rem;
+            font-size: 0.8rem;
+        }
+        #conversation-list li .delete-btn:hover {
+            color: var(--sidebar-text-color);
+        }
+
+        .sidebar-footer {
+            padding-top: 1rem;
+            border-top: 1px solid #3a3a3c;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
         .sidebar-footer p { margin: 0.3rem 0; }
-        .sidebar-footer #logout-btn { background: var(--sidebar-hover-bg); color: var(--sidebar-text-color); border: none; padding: 0.5rem 0.8rem; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 0.5rem; }
+        .sidebar-footer #logout-btn {
+            background: var(--sidebar-hover-bg); color: var(--sidebar-text-color);
+            border: none; padding: 0.5rem 0.8rem; border-radius: 4px;
+            cursor: pointer; width: 100%; margin-top: 0.5rem;
+        }
         .sidebar-footer #logout-btn:hover { background: #4a4b57; }
-        .main-chat { flex: 1; display: flex; flex-direction: column; background-color: var(--chat-bg); overflow: hidden; }
-        .chat-header { padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: #fdfdfd; }
-        .chat-header h1 { font-size: 1.2rem; margin: 0; color: #444; }
-        .chat-controls { display: flex; align-items: center; gap: 0.8rem; }
-        .model-selector { padding: 0.5rem 0.8rem; border: 1px solid var(--input-border-color); border-radius: 6px; background-color: var(--input-bg); color: var(--text-color); font-size: 0.9rem; }
-        .clear-chat-btn { background-color: #6c757d; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; transition: background-color 0.2s; }
+
+        /* Main Chat Area Base */
+        .main-chat {
+            flex: 1; /* Takes up all available space not used by a static sidebar */
+            display: flex;
+            flex-direction: column;
+            background-color: var(--chat-bg);
+            overflow: hidden; /* Internal scrolling for chat-box */
+            width: 100%; /* For mobile when sidebar is off-canvas */
+        }
+
+        .chat-header {
+            padding: 0.8rem 1rem; /* Adjusted padding for mobile */
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            /* justify-content: space-between; /* Adjusted for hamburger */
+            align-items: center;
+            background-color: #fdfdfd;
+            flex-shrink: 0;
+        }
+        #hamburger-btn {
+            display: block; /* Visible by default (mobile-first) */
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 1.5rem; /* Hamburger icon size */
+            cursor: pointer;
+            padding: 0.5rem;
+            margin-right: 0.5rem;
+        }
+        .chat-header h1 {
+            font-size: 1rem; /* Adjusted for mobile */
+            margin: 0;
+            color: #444;
+            flex-grow: 1; /* Allow title to take space */
+        }
+        .chat-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem; /* Adjusted gap */
+        }
+        .model-selector {
+            padding: 0.4rem 0.6rem; /* Adjusted */
+            border: 1px solid var(--input-border-color); border-radius: 6px;
+            background-color: var(--input-bg); color: var(--text-color);
+            font-size: 0.8rem; /* Adjusted */
+        }
+        .clear-chat-btn {
+            background-color: #6c757d; color: white; border: none;
+            padding: 0.4rem 0.8rem; /* Adjusted */
+            border-radius: 6px; cursor: pointer;
+            font-size: 0.8rem; /* Adjusted */
+            transition: background-color 0.2s;
+        }
         .clear-chat-btn:hover { background-color: #5a6268; }
-        #error-message { background-color: var(--error-bg); color: var(--error-text); padding: 0.8rem 1.2rem; margin: 0.5rem 1.5rem; border-radius: 6px; display: none; justify-content: space-between; align-items: center; font-size: 0.9rem; }
-        #error-message .close-btn { background: none; border: none; color: var(--error-text); font-size: 1.2rem; cursor: pointer; padding: 0 0.5rem; }
-        #chat-box { flex: 1; overflow-y: auto; padding: 1.5rem; background: var(--bg-color); position: relative; }
-        .message { margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px; max-width: 80%; line-height: 1.6; box-shadow: 0 1px 3px rgba(0,0,0,0.08); white-space: pre-wrap; }
-        .message strong { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem; }
-        .user-message { background: var(--user-msg-bg); color: #1f5c3b; margin-left: auto; border-bottom-right-radius: 0; }
-        .ai-message { background: var(--ai-msg-bg); color: #721c24; margin-right: auto; border-bottom-left-radius: 0; }
+
+        #error-message {
+            background-color: var(--error-bg); color: var(--error-text);
+            padding: 0.8rem 1.2rem; margin: 0.5rem 1rem; /* Adjusted margin */
+            border-radius: 6px; display: none; justify-content: space-between;
+            align-items: center; font-size: 0.9rem; flex-shrink: 0;
+        }
+        #error-message .close-btn {
+            background: none; border: none; color: var(--error-text);
+            font-size: 1.2rem; cursor: pointer; padding: 0 0.5rem;
+        }
+
+        #chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem; /* Adjusted padding */
+            background: var(--bg-color);
+            position: relative;
+        }
+        .message {
+            margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px;
+            max-width: 90%; /* Adjusted for mobile */
+            line-height: 1.6; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            white-space: pre-wrap;
+        }
+        .message strong {
+            display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.9rem;
+        }
+        .user-message {
+            background: var(--user-msg-bg); color: #1f5c3b;
+            margin-left: auto; border-bottom-right-radius: 0;
+        }
+        .ai-message {
+            background: var(--ai-msg-bg); color: #721c24;
+            margin-right: auto; border-bottom-left-radius: 0;
+        }
         .ai-message .message-content p:last-child { margin-bottom: 0; }
-        .ai-message .message-content pre { background-color: #2d2d2d; color: #f0f0f0; padding: 0.8rem; border-radius: 6px; overflow-x: auto; font-size: 0.85em; }
-        .ai-message .message-content code { background-color: #e9ecef; color: #c7254e; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.85em; }
-        .ai-message .message-content pre code { background-color: transparent; color: inherit; padding: 0; border-radius: 0; }
+        .ai-message .message-content pre {
+            background-color: #2d2d2d; color: #f0f0f0; padding: 0.8rem;
+            border-radius: 6px; overflow-x: auto; font-size: 0.85em;
+        }
+        .ai-message .message-content code {
+            background-color: #e9ecef; color: #c7254e; padding: 0.2em 0.4em;
+            border-radius: 3px; font-size: 0.85em;
+        }
+        .ai-message .message-content pre code {
+            background-color: transparent; color: inherit; padding: 0; border-radius: 0;
+        }
         .ai-message .message-content ul, .ai-message .message-content ol { padding-left: 1.5rem; }
-        .message-timestamp { font-size: 0.75rem; color: #777; margin-top: 0.6rem; text-align: right; }
+        .message-timestamp {
+            font-size: 0.75rem; color: #777; margin-top: 0.6rem; text-align: right;
+        }
         .user-message .message-timestamp { color: #4a7c59; }
         .ai-message .message-timestamp { color: #a0525a; }
-        .input-area { padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); background-color: #f0f2f5; display: flex; align-items: flex-end; gap: 0.8rem; }
-        #user-input { flex: 1; padding: 0.8rem 1rem; border: 1px solid var(--input-border-color); border-radius: 8px; resize: none; min-height: 44px; max-height: 200px; overflow-y: auto; font-size: 1rem; line-height: 1.5; background-color: var(--input-bg); }
-        #user-input:focus { outline: none; border-color: var(--primary-accent); box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2); }
-        #send-btn { background: var(--primary-accent); color: var(--button-text-color); border: none; padding: 0.7rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; transition: background-color 0.2s; align-self: flex-end; height: 44px; }
+
+        .input-area {
+            padding: 0.8rem 1rem; /* Adjusted for mobile */
+            border-top: 1px solid var(--border-color); background-color: #f0f2f5;
+            display: flex; align-items: flex-end; gap: 0.8rem; flex-shrink: 0;
+        }
+        #user-input {
+            flex: 1; padding: 0.8rem 1rem; border: 1px solid var(--input-border-color);
+            border-radius: 8px; resize: none; min-height: 44px; max-height: 200px;
+            overflow-y: auto; font-size: 0.9rem; /* Adjusted */
+            line-height: 1.5; background-color: var(--input-bg);
+        }
+        #user-input:focus {
+            outline: none; border-color: var(--primary-accent);
+            box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.2);
+        }
+        #send-btn {
+            background: var(--primary-accent); color: var(--button-text-color);
+            border: none; padding: 0.7rem 1rem; /* Adjusted */
+            border-radius: 8px; cursor: pointer; font-size: 0.9rem; /* Adjusted */
+            transition: background-color 0.2s; align-self: flex-end; height: 44px;
+        }
         #send-btn:hover { background-color: #0e8e6d; }
         #send-btn:disabled { background-color: #a0a0a0; cursor: not-allowed; }
-        #scroll-to-bottom { position: absolute; bottom: 20px; right: 20px; background: var(--primary-accent); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; display: none; cursor: pointer; font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+
+        #scroll-to-bottom {
+            position: absolute; bottom: 20px; right: 20px;
+            background: var(--primary-accent); color: white; border: none;
+            width: 40px; height: 40px; border-radius: 50%; display: none;
+            cursor: pointer; font-size: 1.2rem; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
         #scroll-to-bottom:hover { background-color: #0e8e6d; }
-        /* Responsive adjustments */
-        @media (max-width: 768px) { 
-            .sidebar { 
-                width: 100%; 
-                order: 1;
+
+        #sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999; /* Below sidebar, above main content */
+            display: none; /* Hidden by default */
+        }
+        #sidebar-overlay.active {
+            display: block;
+        }
+
+        /* --- Tablet Styles --- */
+        @media (min-width: 768px) {
+            #hamburger-btn, #sidebar-overlay {
+                display: none; /* Hide hamburger and overlay */
             }
-            .main-chat { 
-                width: 100%; 
-                order: 2;
+            .sidebar {
+                position: static; /* Not fixed, part of flex flow */
+                left: auto;
+                width: var(--sidebar-width-tablet);
+                height: 100%; /* Take full height of parent .container */
+                transition: none;
+                z-index: auto;
+                border-right: 1px solid #3a3a3c;
             }
-            .chat-header h1 { 
-                font-size: 1rem;
+            .sidebar.open { /* Reset .open state if it was somehow applied */
+                left: auto;
             }
-            .message { 
-                max-width: 90%; 
+            .main-chat {
+                /* flex: 1; Already set, takes remaining space */
+                width: auto; /* Allow flex to determine width */
             }
-            .input-area { 
-                padding: 0.8rem 1rem; 
+            /* Restore some paddings/font sizes if they were too small for mobile */
+            .chat-header { padding: 0.8rem 1.5rem; }
+            .chat-header h1 { font-size: 1.1rem; }
+            #chat-box { padding: 1.5rem; }
+            .input-area { padding: 1rem 1.5rem; }
+            #user-input, #send-btn { font-size: 0.95rem; }
+            .model-selector, .clear-chat-btn { font-size: 0.85rem; padding: 0.5rem 0.8rem; }
+        }
+
+        /* --- PC/Desktop Styles --- */
+        @media (min-width: 1024px) {
+            .sidebar {
+                width: var(--sidebar-width-pc);
             }
-            #user-input, #send-btn { 
-                font-size: 0.9rem;
-            }
-            .sidebar-header h3 { 
-                font-size: 1rem;
-            }
-            #conversation-list li {
-                padding: 0.5rem; 
-            }
-            .clear-chat-btn, .model-selector {
-                font-size: 0.8rem; 
-            }
-            #chat-box {
-                overflow-x: auto;
-            }
+            .chat-header h1 { font-size: 1.2rem; }
+            #user-input, #send-btn { font-size: 1rem; }
+             .model-selector, .clear-chat-btn { font-size: 0.9rem; }
         }
     </style>
 </head>
@@ -122,9 +360,10 @@
                 <button id="logout-btn" onclick="logout()">登出</button>
             </div>
         </div>
+
         <div class="main-chat">
             <div class="chat-header">
-                <h1>HuengZing的助手</h1>
+                <button id="hamburger-btn">☰</button> <h1>HuengZing的助手</h1>
                 <div class="chat-controls">
                     <select class="model-selector" id="model-select">
                         <option value="v3">通用聊天模型 (v3)</option>
@@ -146,8 +385,8 @@
             </div>
         </div>
     </div>
-
-    <script>
+    <div id="sidebar-overlay"></div> <script>
+        // --- Existing JavaScript ---
         let currentConversationId = '{{ current_conversation_id|default:""|escapejs }}';
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
@@ -158,9 +397,8 @@
         const conversationList = document.getElementById('conversation-list');
         const sidebarUpdateDebounce = 1000;
 
-        // Globals related to scrolling behavior
-        let userHasManuallyScrolled = false; // True if user has scrolled up from the bottom
-        let autoScrollPaused = false;      // True if AI is typing AND user has scrolled up, pausing auto-scroll for current AI message
+        let userHasManuallyScrolled = false; 
+        let autoScrollPaused = false;   
 
         if (currentConversationId === '' || currentConversationId === 'None' || currentConversationId === 'undefined') {
             currentConversationId = null;
@@ -179,31 +417,26 @@
             userInput.style.height = `${newHeight}px`;
         });
 
-        // Check if the chatbox is scrolled to the bottom (with a small tolerance)
         function isScrolledToBottom() {
-            const threshold = 50; // Pixels from bottom to be considered "at bottom"
-            if (chatBox.offsetHeight === 0 && chatBox.offsetWidth === 0 && chatBox.scrollHeight === 0) { // Handles empty or hidden chatbox
+            const threshold = 50; 
+            if (chatBox.offsetHeight === 0 && chatBox.offsetWidth === 0 && chatBox.scrollHeight === 0) { 
                 return true;
             }
             return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < threshold;
         }
 
-        // Function to scroll the chatbox to the bottom
         function scrollToBottomInternal() {
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Updates the visibility of the "scroll to bottom" button
         function updateScrollToBottomButtonVisibility() {
-            if (!isScrolledToBottom() && chatBox.scrollHeight > chatBox.clientHeight + 10) { // Only show if significant scroll away
+            if (!isScrolledToBottom() && chatBox.scrollHeight > chatBox.clientHeight + 10) { 
                 scrollToBottomBtn.style.display = 'block';
             } else {
                 scrollToBottomBtn.style.display = 'none';
             }
         }
-
-        // Call this when new non-streaming content is added (e.g., user message, initial AI div)
-        // or after a streaming message is fully loaded.
+        
         function handleNewContentScroll() {
             if (!userHasManuallyScrolled) {
                 scrollToBottomInternal();
@@ -211,7 +444,6 @@
             updateScrollToBottomButtonVisibility();
         }
 
-        // Call this during AI typing stream for each chunk
         function handleTypingScroll() {
             if (!userHasManuallyScrolled && !autoScrollPaused) {
                 scrollToBottomInternal();
@@ -219,13 +451,11 @@
             updateScrollToBottomButtonVisibility();
         }
 
-        // Event listener for chatBox scroll
         chatBox.addEventListener('scroll', () => {
             const atBottom = isScrolledToBottom();
-
             if (atBottom) {
                 userHasManuallyScrolled = false;
-                if (isTyping) { // isTyping is from your original code for queue management
+                if (isTyping) { 
                     autoScrollPaused = false;
                 }
             } else {
@@ -237,8 +467,7 @@
             updateScrollToBottomButtonVisibility();
         });
 
-        // Click handler for the "scroll to bottom" button
-        function scrollToBottom() { // This is called by the button's onclick
+        function scrollToBottom() { 
             scrollToBottomInternal();
             userHasManuallyScrolled = false;
             autoScrollPaused = false;
@@ -275,13 +504,8 @@
 
         let typingQueue = [];
         let isTyping = false;
-        let aiMessageContentDiv; // Global reference to the current AI message's content div
+        let aiMessageContentDiv; 
 
-        const punctuationDelays = { // Kept from your original code, not used by default in calculateTypingDelay
-            ',': 150, '，': 150, '.': 400, '。': 400,
-            '!': 400, '！': 400, '?': 400, '？': 400,
-            ':': 200, '：': 200, ';': 200, '；': 200
-        };
         const baseDelay = 50;
         const minDelay = 10;
         const accelerationFactor = 0.5;
@@ -293,30 +517,27 @@
 
         function enqueueTyping(content) {
             typingQueue.push(...content.split(''));
-            if (!isTyping) { // Start processing only if not already doing so
-                 processTypingQueue();
+            if (!isTyping) { 
+                processTypingQueue();
             }
         }
 
         function processTypingQueue() {
             if (typingQueue.length === 0) {
-                isTyping = false; // Ensure isTyping is false if queue is empty
-                // The rest of completion logic is now in typeNext's base case
+                isTyping = false; 
                 return;
             }
-            isTyping = true; // Set true when processing starts
-            let charCount = aiMessageContentDiv ? aiMessageContentDiv.textContent.length : 0; // Resume charCount if appending
+            isTyping = true; 
+            let charCount = aiMessageContentDiv ? aiMessageContentDiv.textContent.length : 0; 
 
             function typeNext() {
                 if (typingQueue.length === 0) {
                     isTyping = false;
-                    autoScrollPaused = false; // Reset pause when this AI message finishes typing
-
+                    autoScrollPaused = false; 
                     if (!userHasManuallyScrolled) {
                         scrollToBottomInternal();
                     }
                     updateScrollToBottomButtonVisibility();
-                    // Timestamp is updated in sendMessage's finally block
                     return;
                 }
 
@@ -325,12 +546,8 @@
                     aiMessageContentDiv.textContent += nextChar;
                 }
                 charCount++;
-
-                handleTypingScroll(); // Scroll or stay based on user actions and typing state
-
+                handleTypingScroll(); 
                 let delay = calculateTypingDelay(charCount);
-                // Optional: Use punctuation delays
-                // delay = punctuationDelays[nextChar] || calculateTypingDelay(charCount);
                 setTimeout(typeNext, delay);
             }
             typeNext();
@@ -361,7 +578,7 @@
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'message ai-message';
             aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content"></div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
-            aiMessageContentDiv = aiMsgDiv.querySelector('.message-content'); // Set global reference
+            aiMessageContentDiv = aiMsgDiv.querySelector('.message-content'); 
             const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
             aiMessageContentDiv.textContent = '';
             chatBox.appendChild(aiMsgDiv);
@@ -379,8 +596,8 @@
 
             let isNewConversationAtStart = !currentConversationId;
             let tempStreamConvId = null;
-            isTyping = false; // Ensure isTyping is false before new stream
-            typingQueue = []; // Clear any stale queue items
+            isTyping = false; 
+            typingQueue = []; 
 
             try {
                 const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
@@ -423,13 +640,12 @@
                                 }
                                 if (data.error) {
                                     showError(data.error);
-                                    rawDataForDoneCheck = '[DONE]'; // Force break outer loop
+                                    rawDataForDoneCheck = '[DONE]'; 
                                     break;
                                 }
                             } catch (e) {
                                 console.error('解析流数据错误:', rawDataForDoneCheck, e);
                                 showError("数据解析错误");
-                                // Potentially break or handle differently
                             }
                         }
                     }
@@ -441,10 +657,7 @@
                     history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
                     debounceUpdateSidebar();
                 }
-                // Ensure typing queue is processed if anything remains (e.g. if [DONE] arrived before queue empty)
-                // processTypingQueue(); // enqueueTyping already handles this.
-
-                // Fallback content if AI produced nothing and no error was caught explicitly
+                
                 if (aiMessageContentDiv && !aiMessageContentDiv.textContent && !isTyping && typingQueue.length === 0) {
                      aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
                 }
@@ -453,21 +666,15 @@
                 console.error('请求错误:', error);
                 if(aiMessageContentDiv) aiMessageContentDiv.innerHTML = renderMarkdown(`请求失败: ${error.message || '请检查网络'}`);
                 showError(`请求失败: ${error.message || '请重试'}`);
-                isTyping = false; // Ensure reset on error
+                isTyping = false; 
                 autoScrollPaused = false;
             } finally {
-                // Wait for typing queue to finish before re-enabling send button
-                // This can be complex if errors occur mid-stream. A simpler approach is to re-enable.
-                // For a more robust solution, you might await typing completion.
                 sendBtn.disabled = false;
                 sendBtn.textContent = '发送';
                 if (aiMessageTimestampDiv) {
                     aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
                 }
-                // Final scroll and button check after everything
-                // isTyping might still be true if an error broke the loop but queue isn't empty
-                // However, typeNext handles setting isTyping = false on queue completion or if it starts empty.
-                handleNewContentScroll(); // Ensures correct position if user wasn't manually scrolled
+                handleNewContentScroll(); 
             }
         }
 
@@ -510,6 +717,14 @@
             autoScrollPaused = false;
             updateScrollToBottomButtonVisibility();
             console.log("New conversation started (UI). currentConversationId:", currentConversationId);
+            
+            // Close sidebar if open on mobile when starting new chat
+            const sidebarElement = document.querySelector('.sidebar');
+            const overlayElement = document.getElementById('sidebar-overlay');
+            if (sidebarElement && sidebarElement.classList.contains('open')) {
+                sidebarElement.classList.remove('open');
+                if (overlayElement) overlayElement.classList.remove('active');
+            }
         }
 
         function debounceUpdateSidebar() {
@@ -557,6 +772,13 @@
                                     li.classList.add('active');
                                     loadMessagesForConversation(currentConversationId);
                                 }
+                                // Close sidebar if open on mobile after selecting a conversation
+                                const sidebarElement = document.querySelector('.sidebar');
+                                const overlayElement = document.getElementById('sidebar-overlay');
+                                if (sidebarElement && sidebarElement.classList.contains('open')) {
+                                    sidebarElement.classList.remove('open');
+                                     if (overlayElement) overlayElement.classList.remove('active');
+                                }
                             };
                             conversationList.appendChild(li);
                         });
@@ -573,7 +795,7 @@
                 updateScrollToBottomButtonVisibility();
                 return;
             }
-            console.log(`Workspaceing messages for conversation ${conversationId}`);
+            console.log(`Loading messages for conversation ${conversationId}`);
             chatBox.innerHTML = '<p style="text-align:center; color:#777;">正在加载聊天记录...</p>';
             try {
                 const url = `/chat/messages/${conversationId}/`;
@@ -624,16 +846,33 @@
                 .catch(err => { console.error('删除对话错误:', err); showError(`删除对话失败: ${err.message}`); });
         }
 
+        // --- New JavaScript for Sidebar Toggle ---
         document.addEventListener('DOMContentLoaded', () => {
+            const hamburgerBtn = document.getElementById('hamburger-btn');
+            const sidebarElement = document.querySelector('.sidebar');
+            const overlayElement = document.getElementById('sidebar-overlay');
+
+            if (hamburgerBtn && sidebarElement && overlayElement) {
+                hamburgerBtn.addEventListener('click', () => {
+                    sidebarElement.classList.toggle('open');
+                    overlayElement.classList.toggle('active');
+                });
+
+                overlayElement.addEventListener('click', () => {
+                    sidebarElement.classList.remove('open');
+                    overlayElement.classList.remove('active');
+                });
+            }
+            
+            // --- Existing DOMContentLoaded logic ---
             console.log("DOM Content Loaded. Initial currentConversationId from Django:", currentConversationId);
             if (currentConversationId) {
                 loadMessagesForConversation(currentConversationId);
             } else {
                 chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或从左侧选择一个已有对话。</p>';
-                updateScrollToBottomButtonVisibility(); // Initial state for empty or new chat
+                updateScrollToBottomButtonVisibility(); 
             }
             updateSidebar();
-             // Fallback to ensure button visibility is correct after initial layout.
             setTimeout(() => {
                 updateScrollToBottomButtonVisibility();
             }, 100);
