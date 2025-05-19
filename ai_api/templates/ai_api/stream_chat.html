@@ -26,6 +26,13 @@
             --sidebar-width-pc: 260px;
             --sidebar-width-tablet: 220px;
             --sidebar-width-mobile: 260px; /* Off-canvas width */
+            --sidebar-shadow: 2px 0 10px rgba(0,0,0,0.2);
+        }
+
+        /* ★★★ Base for full viewport height and no scrollbars on html/body ★★★ */
+        html {
+            height: 100%;
+            overflow: hidden;
         }
 
         body {
@@ -34,16 +41,16 @@
             color: var(--text-color);
             margin: 0;
             padding: 0;
-            display: flex; /* Ensures .container can take full height */
-            height: 100vh;
-            overflow: hidden; /* Prevent body scroll, scrolling managed internally */
+            display: flex;
+            height: 100%; /* Inherit height from html */
+            overflow: hidden;
         }
 
         .container {
             display: flex;
             width: 100%;
-            height: 100%;
-            /* flex-wrap: wrap; /* Removed for new layout logic */
+            flex: 1; /* Allow container to fill body */
+            overflow: hidden; /* Container manages its children's overflow */
         }
 
         /* Sidebar Base (Mobile-first: Off-canvas drawer) */
@@ -53,19 +60,20 @@
             padding: 1rem;
             display: flex;
             flex-direction: column;
-            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-            
+            /* box-shadow initially off for closed state */
+
             position: fixed;
             top: 0;
-            left: calc(-1 * var(--sidebar-width-mobile)); /* Initially hidden off-screen */
+            left: calc(-1 * (var(--sidebar-width-mobile) + 15px)); /* Ensure it's fully off-screen, including shadow space */
             width: var(--sidebar-width-mobile);
-            height: 100%;
+            height: 100vh; /* Fixed position relative to viewport height */
             z-index: 1000;
-            transition: left 0.3s ease-in-out;
-            overflow-y: auto;
+            transition: left 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+            overflow-y: hidden; /* Let #conversation-list handle its own scroll */
         }
         .sidebar.open {
             left: 0;
+            box-shadow: var(--sidebar-shadow); /* Show shadow when open */
         }
 
         .sidebar-header {
@@ -75,7 +83,7 @@
             flex-shrink: 0;
         }
         .sidebar-header h3 {
-            font-size: 1rem; /* Adjusted for mobile */
+            font-size: 1rem;
             margin: 0 0 0.8rem 0;
             text-align: center;
         }
@@ -102,9 +110,10 @@
             margin: 0;
             overflow-y: auto;
             flex-grow: 1;
+            min-height: 0; /* ★★★ CRITICAL FIX for flex child scrolling ★★★ */
         }
         #conversation-list li {
-            padding: 0.5rem; /* Adjusted for mobile */
+            padding: 0.5rem;
             margin-bottom: 0.5rem;
             border-radius: 5px;
             cursor: pointer;
@@ -152,62 +161,65 @@
 
         /* Main Chat Area Base */
         .main-chat {
-            flex: 1; /* Takes up all available space not used by a static sidebar */
+            flex: 1;
             display: flex;
             flex-direction: column;
             background-color: var(--chat-bg);
-            overflow: hidden; /* Internal scrolling for chat-box */
-            width: 100%; /* For mobile when sidebar is off-canvas */
+            overflow: hidden;
+            width: 100%; /* On mobile, sidebar is fixed, main chat takes full width of container */
+            height: 100%; /* Take full height of container */
         }
 
         .chat-header {
-            padding: 0.8rem 1rem; /* Adjusted padding for mobile */
+            padding: 0.8rem 1rem;
             border-bottom: 1px solid var(--border-color);
             display: flex;
-            /* justify-content: space-between; /* Adjusted for hamburger */
             align-items: center;
             background-color: #fdfdfd;
             flex-shrink: 0;
+            position: relative; /* Context for z-index if needed */
+            z-index: 10; /* Ensure header is above chat content if overlap occurs */
         }
         #hamburger-btn {
-            display: block; /* Visible by default (mobile-first) */
+            display: block; /* Mobile first */
             background: none;
             border: none;
             color: var(--text-color);
-            font-size: 1.5rem; /* Hamburger icon size */
+            font-size: 1.5rem;
             cursor: pointer;
             padding: 0.5rem;
             margin-right: 0.5rem;
+            z-index: 101; /* Ensure button is clickable */
         }
         .chat-header h1 {
-            font-size: 1rem; /* Adjusted for mobile */
+            font-size: 1rem;
             margin: 0;
             color: #444;
-            flex-grow: 1; /* Allow title to take space */
+            flex-grow: 1;
         }
         .chat-controls {
             display: flex;
             align-items: center;
-            gap: 0.5rem; /* Adjusted gap */
+            gap: 0.5rem;
         }
         .model-selector {
-            padding: 0.4rem 0.6rem; /* Adjusted */
+            padding: 0.4rem 0.6rem;
             border: 1px solid var(--input-border-color); border-radius: 6px;
             background-color: var(--input-bg); color: var(--text-color);
-            font-size: 0.8rem; /* Adjusted */
+            font-size: 0.8rem;
         }
         .clear-chat-btn {
             background-color: #6c757d; color: white; border: none;
-            padding: 0.4rem 0.8rem; /* Adjusted */
+            padding: 0.4rem 0.8rem;
             border-radius: 6px; cursor: pointer;
-            font-size: 0.8rem; /* Adjusted */
+            font-size: 0.8rem;
             transition: background-color 0.2s;
         }
         .clear-chat-btn:hover { background-color: #5a6268; }
 
         #error-message {
             background-color: var(--error-bg); color: var(--error-text);
-            padding: 0.8rem 1.2rem; margin: 0.5rem 1rem; /* Adjusted margin */
+            padding: 0.8rem 1.2rem; margin: 0.5rem 1rem;
             border-radius: 6px; display: none; justify-content: space-between;
             align-items: center; font-size: 0.9rem; flex-shrink: 0;
         }
@@ -217,15 +229,16 @@
         }
 
         #chat-box {
-            flex: 1;
+            flex: 1; /* Or flex-grow: 1; flex-basis: 0; */
             overflow-y: auto;
-            padding: 1rem; /* Adjusted padding */
+            padding: 1rem;
             background: var(--bg-color);
             position: relative;
+            min-height: 0; /* ★★★ CRITICAL FIX for flex child scrolling ★★★ */
         }
         .message {
             margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px;
-            max-width: 90%; /* Adjusted for mobile */
+            max-width: 90%;
             line-height: 1.6; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             white-space: pre-wrap;
         }
@@ -260,14 +273,14 @@
         .ai-message .message-timestamp { color: #a0525a; }
 
         .input-area {
-            padding: 0.8rem 1rem; /* Adjusted for mobile */
+            padding: 0.8rem 1rem;
             border-top: 1px solid var(--border-color); background-color: #f0f2f5;
             display: flex; align-items: flex-end; gap: 0.8rem; flex-shrink: 0;
         }
         #user-input {
             flex: 1; padding: 0.8rem 1rem; border: 1px solid var(--input-border-color);
             border-radius: 8px; resize: none; min-height: 44px; max-height: 200px;
-            overflow-y: auto; font-size: 0.9rem; /* Adjusted */
+            overflow-y: auto; font-size: 0.9rem;
             line-height: 1.5; background-color: var(--input-bg);
         }
         #user-input:focus {
@@ -276,8 +289,8 @@
         }
         #send-btn {
             background: var(--primary-accent); color: var(--button-text-color);
-            border: none; padding: 0.7rem 1rem; /* Adjusted */
-            border-radius: 8px; cursor: pointer; font-size: 0.9rem; /* Adjusted */
+            border: none; padding: 0.7rem 1rem;
+            border-radius: 8px; cursor: pointer; font-size: 0.9rem;
             transition: background-color 0.2s; align-self: flex-end; height: 44px;
         }
         #send-btn:hover { background-color: #0e8e6d; }
@@ -299,33 +312,38 @@
             width: 100%;
             height: 100%;
             background: rgba(0,0,0,0.5);
-            z-index: 999; /* Below sidebar, above main content */
-            display: none; /* Hidden by default */
+            z-index: 999;
+            display: none;
         }
         #sidebar-overlay.active {
             display: block;
         }
 
-        /* --- Tablet Styles --- */
+        /* --- Tablet Styles (min-width: 768px) --- */
         @media (min-width: 768px) {
+            .container {
+                 flex-direction: row; /* Sidebar and Main chat side-by-side */
+            }
             #hamburger-btn, #sidebar-overlay {
-                display: none; /* Hide hamburger and overlay */
+                display: none;
             }
             .sidebar {
-                position: static; /* Not fixed, part of flex flow */
-                left: auto;
+                position: static;
+                left: auto; /* Reset fixed positioning */
                 width: var(--sidebar-width-tablet);
-                height: 100%; /* Take full height of parent .container */
+                height: 100%; /* Full height of container */
                 transition: none;
                 z-index: auto;
                 border-right: 1px solid #3a3a3c;
+                box-shadow: var(--sidebar-shadow); /* Static sidebar can have shadow */
+                overflow-y: hidden; /* Let internal #conversation-list scroll */
             }
-            .sidebar.open { /* Reset .open state if it was somehow applied */
-                left: auto;
-            }
+            /* No need for .sidebar.open specific style changes here as it's always "open" (visible) */
+
             .main-chat {
-                /* flex: 1; Already set, takes remaining space */
-                width: auto; /* Allow flex to determine width */
+                /* flex: 1; is already defined and will work correctly */
+                 width: auto; /* Let flexbox determine width */
+                 height: 100%;
             }
             /* Restore some paddings/font sizes if they were too small for mobile */
             .chat-header { padding: 0.8rem 1.5rem; }
@@ -336,14 +354,14 @@
             .model-selector, .clear-chat-btn { font-size: 0.85rem; padding: 0.5rem 0.8rem; }
         }
 
-        /* --- PC/Desktop Styles --- */
+        /* --- PC/Desktop Styles (min-width: 1024px) --- */
         @media (min-width: 1024px) {
             .sidebar {
                 width: var(--sidebar-width-pc);
             }
             .chat-header h1 { font-size: 1.2rem; }
             #user-input, #send-btn { font-size: 1rem; }
-             .model-selector, .clear-chat-btn { font-size: 0.9rem; }
+            .model-selector, .clear-chat-btn { font-size: 0.9rem; }
         }
     </style>
 </head>
@@ -397,8 +415,8 @@
         const conversationList = document.getElementById('conversation-list');
         const sidebarUpdateDebounce = 1000;
 
-        let userHasManuallyScrolled = false; 
-        let autoScrollPaused = false;   
+        let userHasManuallyScrolled = false;
+        let autoScrollPaused = false;
 
         if (currentConversationId === '' || currentConversationId === 'None' || currentConversationId === 'undefined') {
             currentConversationId = null;
@@ -418,25 +436,28 @@
         });
 
         function isScrolledToBottom() {
-            const threshold = 50; 
-            if (chatBox.offsetHeight === 0 && chatBox.offsetWidth === 0 && chatBox.scrollHeight === 0) { 
+            const threshold = 50;
+            if (!chatBox || (chatBox.offsetHeight === 0 && chatBox.offsetWidth === 0 && chatBox.scrollHeight === 0)) { // Added null check for chatBox
                 return true;
             }
             return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < threshold;
         }
 
         function scrollToBottomInternal() {
-            chatBox.scrollTop = chatBox.scrollHeight;
+            if (chatBox) { // Added null check
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
         }
 
         function updateScrollToBottomButtonVisibility() {
-            if (!isScrolledToBottom() && chatBox.scrollHeight > chatBox.clientHeight + 10) { 
+            if (!scrollToBottomBtn) return; // Added null check
+            if (!isScrolledToBottom() && chatBox && chatBox.scrollHeight > chatBox.clientHeight + 10) {
                 scrollToBottomBtn.style.display = 'block';
             } else {
                 scrollToBottomBtn.style.display = 'none';
             }
         }
-        
+
         function handleNewContentScroll() {
             if (!userHasManuallyScrolled) {
                 scrollToBottomInternal();
@@ -451,23 +472,26 @@
             updateScrollToBottomButtonVisibility();
         }
 
-        chatBox.addEventListener('scroll', () => {
-            const atBottom = isScrolledToBottom();
-            if (atBottom) {
-                userHasManuallyScrolled = false;
-                if (isTyping) { 
-                    autoScrollPaused = false;
+        if (chatBox) { // Added null check
+            chatBox.addEventListener('scroll', () => {
+                const atBottom = isScrolledToBottom();
+                if (atBottom) {
+                    userHasManuallyScrolled = false;
+                    if (isTyping) {
+                        autoScrollPaused = false;
+                    }
+                } else {
+                    userHasManuallyScrolled = true;
+                    if (isTyping && !autoScrollPaused) {
+                        autoScrollPaused = true;
+                    }
                 }
-            } else {
-                userHasManuallyScrolled = true;
-                if (isTyping && !autoScrollPaused) {
-                    autoScrollPaused = true;
-                }
-            }
-            updateScrollToBottomButtonVisibility();
-        });
+                updateScrollToBottomButtonVisibility();
+            });
+        }
 
-        function scrollToBottom() { 
+
+        function scrollToBottom() {
             scrollToBottomInternal();
             userHasManuallyScrolled = false;
             autoScrollPaused = false;
@@ -488,11 +512,23 @@
             }
             return cookieValue;
         }
-        function hideError() { errorMessageContainer.style.display = 'none'; errorMessageText.textContent = ''; }
-        function showError(message) { errorMessageText.textContent = message; errorMessageContainer.style.display = 'flex'; setTimeout(hideError, 7000); }
+        function hideError() {
+            if (errorMessageContainer) { // Added null check
+                errorMessageContainer.style.display = 'none';
+                if (errorMessageText) errorMessageText.textContent = '';
+            }
+        }
+        function showError(message) {
+            if (errorMessageContainer && errorMessageText) { // Added null checks
+                errorMessageText.textContent = message;
+                errorMessageContainer.style.display = 'flex';
+                setTimeout(hideError, 7000);
+            }
+        }
 
         function logout() {
             const logoutBtn = document.getElementById('logout-btn');
+            if (!logoutBtn) return; // Added null check
             logoutBtn.disabled = true; logoutBtn.textContent = '登出中...';
             fetch("{% url 'ai_api:logout' %}", { method: 'GET' })
                 .then(response => response.json())
@@ -500,11 +536,11 @@
                 .catch(err => { console.error('登出错误:', err); showError('登出通讯失败'); })
                 .finally(() => { logoutBtn.disabled = false; logoutBtn.textContent = '登出'; });
         }
-        function handleKeydown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); } }
+        function handleKeydown(event) { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if(typeof sendMessage === 'function') sendMessage(); } }
 
         let typingQueue = [];
         let isTyping = false;
-        let aiMessageContentDiv; 
+        let aiMessageContentDiv;
 
         const baseDelay = 50;
         const minDelay = 10;
@@ -517,23 +553,23 @@
 
         function enqueueTyping(content) {
             typingQueue.push(...content.split(''));
-            if (!isTyping) { 
+            if (!isTyping) {
                 processTypingQueue();
             }
         }
 
         function processTypingQueue() {
             if (typingQueue.length === 0) {
-                isTyping = false; 
+                isTyping = false;
                 return;
             }
-            isTyping = true; 
-            let charCount = aiMessageContentDiv ? aiMessageContentDiv.textContent.length : 0; 
+            isTyping = true;
+            let charCount = aiMessageContentDiv ? aiMessageContentDiv.textContent.length : 0;
 
             function typeNext() {
                 if (typingQueue.length === 0) {
                     isTyping = false;
-                    autoScrollPaused = false; 
+                    autoScrollPaused = false;
                     if (!userHasManuallyScrolled) {
                         scrollToBottomInternal();
                     }
@@ -546,7 +582,7 @@
                     aiMessageContentDiv.textContent += nextChar;
                 }
                 charCount++;
-                handleTypingScroll(); 
+                handleTypingScroll();
                 let delay = calculateTypingDelay(charCount);
                 setTimeout(typeNext, delay);
             }
@@ -554,8 +590,11 @@
         }
 
         async function sendMessage() {
+            if (!userInput || !sendBtn) return; // Added null checks
+
             const question = userInput.value.trim();
-            const model = document.getElementById('model-select').value;
+            const modelSelect = document.getElementById('model-select');
+            const model = modelSelect ? modelSelect.value : 'v3'; // Default if not found
             if (!question) return;
 
             userHasManuallyScrolled = false;
@@ -572,16 +611,16 @@
             userMsgDiv.className = 'message user-message';
             const sanitizedQuestion = DOMPurify.sanitize(question, { USE_PROFILES: { html: true } });
             userMsgDiv.innerHTML = `<strong>您:</strong><div class="message-content">${sanitizedQuestion.replace(/\n/g, '<br>')}</div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
-            chatBox.appendChild(userMsgDiv);
+            if (chatBox) chatBox.appendChild(userMsgDiv);
             handleNewContentScroll();
 
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'message ai-message';
             aiMsgDiv.innerHTML = `<strong>AI助手:</strong><div class="message-content"></div><div class="message-timestamp">${new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</div>`;
-            aiMessageContentDiv = aiMsgDiv.querySelector('.message-content'); 
+            aiMessageContentDiv = aiMsgDiv.querySelector('.message-content');
             const aiMessageTimestampDiv = aiMsgDiv.querySelector('.message-timestamp');
-            aiMessageContentDiv.textContent = '';
-            chatBox.appendChild(aiMsgDiv);
+            if (aiMessageContentDiv) aiMessageContentDiv.textContent = '';
+            if (chatBox) chatBox.appendChild(aiMsgDiv);
             handleNewContentScroll();
 
             const csrftoken = getCookie('csrftoken');
@@ -596,8 +635,8 @@
 
             let isNewConversationAtStart = !currentConversationId;
             let tempStreamConvId = null;
-            isTyping = false; 
-            typingQueue = []; 
+            isTyping = false;
+            typingQueue = [];
 
             try {
                 const response = await fetch("{% url 'ai_api:stream_chat_api' %}", {
@@ -640,7 +679,7 @@
                                 }
                                 if (data.error) {
                                     showError(data.error);
-                                    rawDataForDoneCheck = '[DONE]'; 
+                                    rawDataForDoneCheck = '[DONE]';
                                     break;
                                 }
                             } catch (e) {
@@ -655,9 +694,9 @@
                 if (isNewConversationAtStart && tempStreamConvId) {
                     currentConversationId = tempStreamConvId;
                     history.pushState({ conversation_id: currentConversationId }, '', `/stream_chat/${currentConversationId}/`);
-                    debounceUpdateSidebar();
+                    if(typeof debounceUpdateSidebar === 'function') debounceUpdateSidebar();
                 }
-                
+
                 if (aiMessageContentDiv && !aiMessageContentDiv.textContent && !isTyping && typingQueue.length === 0) {
                      aiMessageContentDiv.innerHTML = renderMarkdown("AI未返回有效内容。");
                 }
@@ -666,15 +705,17 @@
                 console.error('请求错误:', error);
                 if(aiMessageContentDiv) aiMessageContentDiv.innerHTML = renderMarkdown(`请求失败: ${error.message || '请检查网络'}`);
                 showError(`请求失败: ${error.message || '请重试'}`);
-                isTyping = false; 
+                isTyping = false;
                 autoScrollPaused = false;
             } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = '发送';
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                    sendBtn.textContent = '发送';
+                }
                 if (aiMessageTimestampDiv) {
                     aiMessageTimestampDiv.textContent = new Date().toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' });
                 }
-                handleNewContentScroll(); 
+                handleNewContentScroll();
             }
         }
 
@@ -686,13 +727,15 @@
         function clearChat() {
             if (currentConversationId) {
                 if (confirm('此操作会删除当前对话的所有聊天记录。确定清空吗？')) {
-                    deleteConversation(currentConversationId, true);
+                    if(typeof deleteConversation === 'function') deleteConversation(currentConversationId, true);
                 }
             } else {
-                chatBox.innerHTML = '';
-                userInput.value = '';
-                userInput.style.height = 'auto';
-                userInput.style.overflowY = 'hidden';
+                if (chatBox) chatBox.innerHTML = '';
+                if (userInput) {
+                    userInput.value = '';
+                    userInput.style.height = 'auto';
+                    userInput.style.overflowY = 'hidden';
+                }
                 hideError();
                 userHasManuallyScrolled = false;
                 autoScrollPaused = false;
@@ -703,22 +746,23 @@
 
         function startNewConversation() {
             currentConversationId = null;
-            chatBox.innerHTML = '';
-            userInput.value = '';
-            userInput.style.height = 'auto';
-            userInput.style.overflowY = 'hidden';
+            if (chatBox) chatBox.innerHTML = '';
+            if (userInput) {
+                userInput.value = '';
+                userInput.style.height = 'auto';
+                userInput.style.overflowY = 'hidden';
+            }
             hideError();
             history.pushState({}, '', "{% url 'ai_api:stream_chat_new' %}");
 
-            const activeItem = conversationList.querySelector('li.active');
+            const activeItem = conversationList ? conversationList.querySelector('li.active') : null;
             if (activeItem) { activeItem.classList.remove('active'); }
 
             userHasManuallyScrolled = false;
             autoScrollPaused = false;
             updateScrollToBottomButtonVisibility();
             console.log("New conversation started (UI). currentConversationId:", currentConversationId);
-            
-            // Close sidebar if open on mobile when starting new chat
+
             const sidebarElement = document.querySelector('.sidebar');
             const overlayElement = document.getElementById('sidebar-overlay');
             if (sidebarElement && sidebarElement.classList.contains('open')) {
@@ -730,11 +774,12 @@
         function debounceUpdateSidebar() {
             clearTimeout(window.sidebarUpdateTimer);
             window.sidebarUpdateTimer = setTimeout(() => {
-                updateSidebar();
+                if(typeof updateSidebar === 'function') updateSidebar();
             }, sidebarUpdateDebounce);
         }
 
         function updateSidebar() {
+            if (!conversationList) return; // Added null check
             console.log("Attempting to update sidebar. Current active ID:", currentConversationId);
             fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } })
                 .then(response => { if (!response.ok) throw new Error('获取对话列表失败 ' + response.status); return response.json(); })
@@ -761,7 +806,7 @@
                                 li.classList.add('active');
                             }
                             const sanitizedTitle = DOMPurify.sanitize(conv.title || '无标题对话');
-                            li.innerHTML = `<span class="title">${sanitizedTitle}</span><button class="delete-btn" title="删除对话" onclick="event.stopPropagation(); deleteConversation('${conv.id}')">🗑️</button>`;
+                            li.innerHTML = `<span class="title">${sanitizedTitle}</span><button class="delete-btn" title="删除对话" onclick="event.stopPropagation(); if(typeof deleteConversation === 'function') deleteConversation('${conv.id}')">🗑️</button>`;
                             li.onclick = () => {
                                 if (currentConversationId !== conv.id.toString()) {
                                     console.log("Switching to conversation:", conv.id);
@@ -770,9 +815,8 @@
 
                                     document.querySelectorAll('#conversation-list li.active').forEach(item => item.classList.remove('active'));
                                     li.classList.add('active');
-                                    loadMessagesForConversation(currentConversationId);
+                                    if(typeof loadMessagesForConversation === 'function') loadMessagesForConversation(currentConversationId);
                                 }
-                                // Close sidebar if open on mobile after selecting a conversation
                                 const sidebarElement = document.querySelector('.sidebar');
                                 const overlayElement = document.getElementById('sidebar-overlay');
                                 if (sidebarElement && sidebarElement.classList.contains('open')) {
@@ -790,6 +834,7 @@
         }
 
         async function loadMessagesForConversation(conversationId) {
+            if (!chatBox) return; // Added null check
             if (!conversationId) {
                 chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或选择一个已有对话。</p>';
                 updateScrollToBottomButtonVisibility();
@@ -838,22 +883,22 @@
                     if (data.success) {
                         showError('对话已删除。');
                         if (conversationIdToDelete.toString() === currentConversationId) {
-                            startNewConversation();
+                            if(typeof startNewConversation === 'function') startNewConversation();
                         }
-                        debounceUpdateSidebar();
+                        if(typeof debounceUpdateSidebar === 'function') debounceUpdateSidebar();
                     } else { throw new Error(data.error || '删除失败'); }
                 })
                 .catch(err => { console.error('删除对话错误:', err); showError(`删除对话失败: ${err.message}`); });
         }
 
-        // --- New JavaScript for Sidebar Toggle ---
         document.addEventListener('DOMContentLoaded', () => {
             const hamburgerBtn = document.getElementById('hamburger-btn');
             const sidebarElement = document.querySelector('.sidebar');
             const overlayElement = document.getElementById('sidebar-overlay');
 
             if (hamburgerBtn && sidebarElement && overlayElement) {
-                hamburgerBtn.addEventListener('click', () => {
+                hamburgerBtn.addEventListener('click', (event) => { // Added event param
+                    event.stopPropagation(); // Stop click from bubbling to other elements if any
                     sidebarElement.classList.toggle('open');
                     overlayElement.classList.toggle('active');
                 });
@@ -862,17 +907,18 @@
                     sidebarElement.classList.remove('open');
                     overlayElement.classList.remove('active');
                 });
+            } else {
+                console.error("Sidebar toggle elements (hamburger, sidebar, or overlay) not found!");
             }
-            
-            // --- Existing DOMContentLoaded logic ---
+
             console.log("DOM Content Loaded. Initial currentConversationId from Django:", currentConversationId);
             if (currentConversationId) {
-                loadMessagesForConversation(currentConversationId);
+                if(typeof loadMessagesForConversation === 'function') loadMessagesForConversation(currentConversationId);
             } else {
-                chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或从左侧选择一个已有对话。</p>';
-                updateScrollToBottomButtonVisibility(); 
+                if (chatBox) chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或从左侧选择一个已有对话。</p>';
+                updateScrollToBottomButtonVisibility();
             }
-            updateSidebar();
+            if(typeof updateSidebar === 'function') updateSidebar();
             setTimeout(() => {
                 updateScrollToBottomButtonVisibility();
             }, 100);
