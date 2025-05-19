@@ -26,11 +26,17 @@
             --sidebar-width-pc: 260px;
             --sidebar-width-tablet: 220px;
             --sidebar-width-mobile: 260px; /* Off-canvas width */
-            --sidebar-shadow: 2px 0 10px rgba(0,0,0,0.2);
+            --sidebar-shadow: 2px 0 10px rgba(0,0,0,0.2); /* ★★★ 提取阴影为变量 ★★★ */
         }
 
-        /* ★★★ Base for full viewport height and no scrollbars on html/body ★★★ */
-        html {
+        /* ★★★ Global Box Sizing ★★★ */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html { /* ★★★ 确保 html 也有高度和 overflow 设置 ★★★ */
             height: 100%;
             overflow: hidden;
         }
@@ -42,15 +48,15 @@
             margin: 0;
             padding: 0;
             display: flex;
-            height: 100%; /* Inherit height from html */
+            height: 100%; /* ★★★ 改为 100% 以正确继承 html 的高度 ★★★ */
             overflow: hidden;
         }
 
         .container {
             display: flex;
             width: 100%;
-            flex: 1; /* Allow container to fill body */
-            overflow: hidden; /* Container manages its children's overflow */
+            flex: 1; /* ★★★ 让 container 填满 body ★★★ */
+            overflow: hidden; /* ★★★ container 内部管理其子元素的溢出 ★★★ */
         }
 
         /* Sidebar Base (Mobile-first: Off-canvas drawer) */
@@ -60,20 +66,22 @@
             padding: 1rem;
             display: flex;
             flex-direction: column;
-            /* box-shadow initially off for closed state */
-
+            /* box-shadow: 2px 0 5px rgba(0,0,0,0.1); /* ★★★ 移除这里的固定阴影 ★★★ */
+            
             position: fixed;
             top: 0;
-            left: calc(-1 * (var(--sidebar-width-mobile) + 15px)); /* Ensure it's fully off-screen, including shadow space */
+            /* ★★★ 如果box-sizing:border-box正确应用，这个left值应能精确隐藏 ★★★ */
+            left: calc(-1 * var(--sidebar-width-mobile)); 
             width: var(--sidebar-width-mobile);
-            height: 100vh; /* Fixed position relative to viewport height */
+            height: 100vh; /* ★★★ 对于 fixed 定位的元素，100vh 是相对于视口的 ★★★ */
             z-index: 1000;
-            transition: left 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-            overflow-y: hidden; /* Let #conversation-list handle its own scroll */
+            /* ★★★ 为 box-shadow 添加过渡 ★★★ */
+            transition: left 0.3s ease-in-out, box-shadow 0.3s ease-in-out; 
+            overflow-y: hidden; /* ★★★ 改为 hidden，让内部 #conversation-list 滚动 ★★★ */
         }
         .sidebar.open {
             left: 0;
-            box-shadow: var(--sidebar-shadow); /* Show shadow when open */
+            box-shadow: var(--sidebar-shadow); /* ★★★ 只在打开时显示阴影 ★★★ */
         }
 
         .sidebar-header {
@@ -108,9 +116,9 @@
             list-style: none;
             padding: 0;
             margin: 0;
-            overflow-y: auto;
+            overflow-y: auto; /* ★★★ 确保对话列表可以滚动 ★★★ */
             flex-grow: 1;
-            min-height: 0; /* ★★★ CRITICAL FIX for flex child scrolling ★★★ */
+            min-height: 0; /* ★★★ 关键修复: 允许在flex容器中正确缩小和滚动 ★★★ */
         }
         #conversation-list li {
             padding: 0.5rem;
@@ -165,9 +173,9 @@
             display: flex;
             flex-direction: column;
             background-color: var(--chat-bg);
-            overflow: hidden;
-            width: 100%; /* On mobile, sidebar is fixed, main chat takes full width of container */
-            height: 100%; /* Take full height of container */
+            overflow: hidden; /* 内部 #chat-box 滚动 */
+            width: 100%; 
+            height: 100%; /* ★★★ 确保 main-chat 填满其在 container 中的分配空间 ★★★ */
         }
 
         .chat-header {
@@ -177,11 +185,11 @@
             align-items: center;
             background-color: #fdfdfd;
             flex-shrink: 0;
-            position: relative; /* Context for z-index if needed */
-            z-index: 10; /* Ensure header is above chat content if overlap occurs */
+            position: relative; /* ★★★ 确保在iOS上头部不会因滚动条出现跳动 (有时有用) ★★★ */
+            z-index: 10; /* ★★★ 确保header在chat-box内容之上 ★★★ */
         }
         #hamburger-btn {
-            display: block; /* Mobile first */
+            display: block;
             background: none;
             border: none;
             color: var(--text-color);
@@ -189,7 +197,7 @@
             cursor: pointer;
             padding: 0.5rem;
             margin-right: 0.5rem;
-            z-index: 101; /* Ensure button is clickable */
+            z-index: 101; /* ★★★ 确保汉堡按钮在 chat-header 内容之上且可点击 ★★★ */
         }
         .chat-header h1 {
             font-size: 1rem;
@@ -229,12 +237,12 @@
         }
 
         #chat-box {
-            flex: 1; /* Or flex-grow: 1; flex-basis: 0; */
-            overflow-y: auto;
+            flex: 1; /* 或者 flex-grow: 1; flex-basis: 0; */
+            overflow-y: auto; /* ★★★ 确保聊天内容区域可以滚动 ★★★ */
             padding: 1rem;
             background: var(--bg-color);
-            position: relative;
-            min-height: 0; /* ★★★ CRITICAL FIX for flex child scrolling ★★★ */
+            position: relative; /* 为了 scroll-to-bottom 按钮的定位 */
+            min-height: 0; /* ★★★ 关键修复: 允许在flex容器中正确缩小和滚动 ★★★ */
         }
         .message {
             margin-bottom: 1.2rem; padding: 0.8rem 1.2rem; border-radius: 12px;
@@ -328,21 +336,20 @@
                 display: none;
             }
             .sidebar {
-                position: static;
-                left: auto; /* Reset fixed positioning */
+                position: static; /* ★★★ 恢复文档流 ★★★ */
+                left: auto; 
                 width: var(--sidebar-width-tablet);
-                height: 100%; /* Full height of container */
-                transition: none;
+                height: 100%; 
+                transition: none; /* 平板固定显示，不需要过渡 */
                 z-index: auto;
                 border-right: 1px solid #3a3a3c;
-                box-shadow: var(--sidebar-shadow); /* Static sidebar can have shadow */
-                overflow-y: hidden; /* Let internal #conversation-list scroll */
+                box-shadow: var(--sidebar-shadow); /* 平板固定显示时，可以一直有阴影 */
+                overflow-y: hidden; /* 与移动端保持一致，由内部滚动 */
             }
-            /* No need for .sidebar.open specific style changes here as it's always "open" (visible) */
+            /* .sidebar.open 在此断点下已无特殊视觉效果，因为sidebar已固定显示 */
 
             .main-chat {
-                /* flex: 1; is already defined and will work correctly */
-                 width: auto; /* Let flexbox determine width */
+                 width: auto; 
                  height: 100%;
             }
             /* Restore some paddings/font sizes if they were too small for mobile */
@@ -381,7 +388,8 @@
 
         <div class="main-chat">
             <div class="chat-header">
-                <button id="hamburger-btn">☰</button> <h1>HuengZing的助手</h1>
+                <button id="hamburger-btn">☰</button>
+                <h1>HuengZing的助手</h1>
                 <div class="chat-controls">
                     <select class="model-selector" id="model-select">
                         <option value="v3">通用聊天模型 (v3)</option>
@@ -403,8 +411,11 @@
             </div>
         </div>
     </div>
-    <div id="sidebar-overlay"></div> <script>
+    <div id="sidebar-overlay"></div>
+    <script>
         // --- Existing JavaScript ---
+        // (你的 JavaScript 代码部分保持不变，因为它主要处理聊天逻辑和侧边栏的打开/关闭切换，
+        // 之前的JS修改已经包含了对 null 元素的检查等)
         let currentConversationId = '{{ current_conversation_id|default:""|escapejs }}';
         const chatBox = document.getElementById('chat-box');
         const userInput = document.getElementById('user-input');
@@ -422,35 +433,38 @@
             currentConversationId = null;
         }
 
-        userInput.addEventListener('input', () => {
-            userInput.style.height = 'auto';
-            let newHeight = userInput.scrollHeight;
-            const maxHeight = 200;
-            if (newHeight > maxHeight) {
-                newHeight = maxHeight;
-                userInput.style.overflowY = 'auto';
-            } else {
-                userInput.style.overflowY = 'hidden';
-            }
-            userInput.style.height = `${newHeight}px`;
-        });
+        if (userInput) { // Check if userInput exists
+            userInput.addEventListener('input', () => {
+                userInput.style.height = 'auto';
+                let newHeight = userInput.scrollHeight;
+                const maxHeight = 200;
+                if (newHeight > maxHeight) {
+                    newHeight = maxHeight;
+                    userInput.style.overflowY = 'auto';
+                } else {
+                    userInput.style.overflowY = 'hidden';
+                }
+                userInput.style.height = `${newHeight}px`;
+            });
+        }
+
 
         function isScrolledToBottom() {
             const threshold = 50;
-            if (!chatBox || (chatBox.offsetHeight === 0 && chatBox.offsetWidth === 0 && chatBox.scrollHeight === 0)) { // Added null check for chatBox
+            if (!chatBox || (chatBox.offsetHeight === 0 && chatBox.offsetWidth === 0 && chatBox.scrollHeight === 0)) { 
                 return true;
             }
             return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < threshold;
         }
 
         function scrollToBottomInternal() {
-            if (chatBox) { // Added null check
+            if (chatBox) { 
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
         }
 
         function updateScrollToBottomButtonVisibility() {
-            if (!scrollToBottomBtn) return; // Added null check
+            if (!scrollToBottomBtn) return; 
             if (!isScrolledToBottom() && chatBox && chatBox.scrollHeight > chatBox.clientHeight + 10) {
                 scrollToBottomBtn.style.display = 'block';
             } else {
@@ -472,7 +486,7 @@
             updateScrollToBottomButtonVisibility();
         }
 
-        if (chatBox) { // Added null check
+        if (chatBox) { 
             chatBox.addEventListener('scroll', () => {
                 const atBottom = isScrolledToBottom();
                 if (atBottom) {
@@ -513,13 +527,13 @@
             return cookieValue;
         }
         function hideError() {
-            if (errorMessageContainer) { // Added null check
+            if (errorMessageContainer) { 
                 errorMessageContainer.style.display = 'none';
                 if (errorMessageText) errorMessageText.textContent = '';
             }
         }
         function showError(message) {
-            if (errorMessageContainer && errorMessageText) { // Added null checks
+            if (errorMessageContainer && errorMessageText) { 
                 errorMessageText.textContent = message;
                 errorMessageContainer.style.display = 'flex';
                 setTimeout(hideError, 7000);
@@ -528,7 +542,7 @@
 
         function logout() {
             const logoutBtn = document.getElementById('logout-btn');
-            if (!logoutBtn) return; // Added null check
+            if (!logoutBtn) return; 
             logoutBtn.disabled = true; logoutBtn.textContent = '登出中...';
             fetch("{% url 'ai_api:logout' %}", { method: 'GET' })
                 .then(response => response.json())
@@ -590,11 +604,11 @@
         }
 
         async function sendMessage() {
-            if (!userInput || !sendBtn) return; // Added null checks
+            if (!userInput || !sendBtn) return; 
 
             const question = userInput.value.trim();
             const modelSelect = document.getElementById('model-select');
-            const model = modelSelect ? modelSelect.value : 'v3'; // Default if not found
+            const model = modelSelect ? modelSelect.value : 'v3'; 
             if (!question) return;
 
             userHasManuallyScrolled = false;
@@ -755,7 +769,8 @@
             hideError();
             history.pushState({}, '', "{% url 'ai_api:stream_chat_new' %}");
 
-            const activeItem = conversationList ? conversationList.querySelector('li.active') : null;
+            const convList = document.getElementById('conversation-list'); // Use a different var name
+            const activeItem = convList ? convList.querySelector('li.active') : null;
             if (activeItem) { activeItem.classList.remove('active'); }
 
             userHasManuallyScrolled = false;
@@ -779,7 +794,8 @@
         }
 
         function updateSidebar() {
-            if (!conversationList) return; // Added null check
+            const convList = document.getElementById('conversation-list'); // Use a different var name
+            if (!convList) return;
             console.log("Attempting to update sidebar. Current active ID:", currentConversationId);
             fetch("{% url 'ai_api:get_conversations_api' %}", { headers: { 'X-CSRFToken': getCookie('csrftoken') } })
                 .then(response => { if (!response.ok) throw new Error('获取对话列表失败 ' + response.status); return response.json(); })
@@ -787,12 +803,12 @@
                     console.log("Sidebar data received (raw):", data);
                     if (!data || !data.conversations) {
                         console.error("Invalid or missing conversations data from API:", data);
-                        conversationList.innerHTML = '<li>无法加载对话列表。</li>';
+                        convList.innerHTML = '<li>无法加载对话列表。</li>';
                         return;
                     }
                     console.log("Sidebar data received (conversations array):", data.conversations);
 
-                    conversationList.innerHTML = '';
+                    convList.innerHTML = '';
                     if (data.conversations.length > 0) {
                         data.conversations.forEach(conv => {
                             if (!conv || typeof conv.id === 'undefined' || typeof conv.title === 'undefined') {
@@ -824,7 +840,7 @@
                                      if (overlayElement) overlayElement.classList.remove('active');
                                 }
                             };
-                            conversationList.appendChild(li);
+                            convList.appendChild(li);
                         });
                     } else {
                         console.log("No conversations to display in sidebar.");
@@ -834,7 +850,7 @@
         }
 
         async function loadMessagesForConversation(conversationId) {
-            if (!chatBox) return; // Added null check
+            if (!chatBox) return;
             if (!conversationId) {
                 chatBox.innerHTML = '<p style="text-align:center; color:#777;">开始新的对话或选择一个已有对话。</p>';
                 updateScrollToBottomButtonVisibility();
@@ -897,8 +913,8 @@
             const overlayElement = document.getElementById('sidebar-overlay');
 
             if (hamburgerBtn && sidebarElement && overlayElement) {
-                hamburgerBtn.addEventListener('click', (event) => { // Added event param
-                    event.stopPropagation(); // Stop click from bubbling to other elements if any
+                hamburgerBtn.addEventListener('click', (event) => { 
+                    event.stopPropagation(); 
                     sidebarElement.classList.toggle('open');
                     overlayElement.classList.toggle('active');
                 });
